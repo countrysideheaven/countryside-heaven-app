@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
+import 'sales_main_screen.dart';
 // Import all three dashboards
-import 'admin_dashboard.dart';
-import 'partner_dashboard.dart';
+import 'admin_main_screen.dart';
+import 'partner_main_screen.dart';
 import 'customer_main_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -58,10 +58,15 @@ class _LoginScreenState extends State<LoginScreen> {
           );
 
           if (role == 'admin') {
-            Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const AdminDashboard()));
+            Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const AdminMainScreen()));
           } else if (role == 'partner') {
-            Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const PartnerDashboard()));
-          } else {
+            Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const PartnerMainScreen()));
+            
+          }
+          else if (role == 'sales') {
+         Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const SalesMainScreen()));
+       }
+           else {
             // Default to customer
             Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const CustomerMainScreen()));
           }
