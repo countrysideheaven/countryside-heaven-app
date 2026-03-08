@@ -1,6 +1,15 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login_screen.dart';
+
+// --- LUXURY PALETTE ---
+const Color appBgColor = Color(0xFFF2F4F5); // Soft cool grey background
+const Color surfaceWhite = Colors.white;
+const Color textPrimary = Color(0xFF1C1C1E); // Deep slate, almost black
+const Color textSecondary = Color(0xFF8E8E93);
+const Color accentGold = Color(0xFFE5B942); // For ratings
+const Color darkButton = Color(0xFF1C1C1E);
 
 class CustomerMainScreen extends StatefulWidget {
   const CustomerMainScreen({super.key});
@@ -12,45 +21,70 @@ class CustomerMainScreen extends StatefulWidget {
 class _CustomerMainScreenState extends State<CustomerMainScreen> {
   int _selectedIndex = 0;
 
-  // List of all the tabs we are building
   final List<Widget> _pages = [
     const ExploreTab(),
-    const PortfolioTab(),
-    const BookingTab(),
-    const CoOwnersTab(),
+    const Center(child: Text('Portfolio Coming Soon')),
+    const Center(child: Text('Bookings Coming Soon')),
     const ProfileTab(),
   ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: appBgColor,
+      extendBody: true,
       body: _pages[_selectedIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed, // Keeps all icons visible
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        selectedItemColor: const Color(0xFF2E7D32), // Brand Green
-        unselectedItemColor: Colors.grey,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.explore), label: 'Explore'),
-          BottomNavigationBarItem(icon: Icon(Icons.pie_chart), label: 'Portfolio'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_month), label: 'Bookings'),
-          BottomNavigationBarItem(icon: Icon(Icons.group), label: 'Co-owners'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
+      // Floating Pill Navigation (Minimalist)
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          margin: const EdgeInsets.only(left: 32, right: 32, bottom: 16),
+          height: 64,
+          decoration: BoxDecoration(
+            color: surfaceWhite,
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: [
+              BoxShadow(color: textPrimary.withOpacity(0.05), blurRadius: 24, offset: const Offset(0, 12))
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildNavItem(0, Icons.maps_home_work_outlined, Icons.maps_home_work_rounded),
+              _buildNavItem(1, Icons.pie_chart_outline_rounded, Icons.pie_chart_rounded),
+              _buildNavItem(2, Icons.calendar_month_outlined, Icons.calendar_month_rounded),
+              _buildNavItem(3, Icons.person_outline_rounded, Icons.person_rounded),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData unselected, IconData selected) {
+    final isSelected = _selectedIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedIndex = index),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected ? darkButton : Colors.transparent,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          isSelected ? selected : unselected,
+          color: isSelected ? Colors.white : textSecondary,
+          size: 24,
+        ),
       ),
     );
   }
 }
 
 // ==========================================
-// TAB 1: EXPLORE (Connected to Database)
+// TAB 1: EXPLORE (Staggered Animations & Fluid UI)
 // ==========================================
 class ExploreTab extends StatefulWidget {
   const ExploreTab({super.key});
@@ -63,6 +97,9 @@ class _ExploreTabState extends State<ExploreTab> {
   final supabase = Supabase.instance.client;
   List<dynamic> _properties = [];
   bool _isLoading = true;
+  String _selectedFilter = 'All Estates';
+
+  final List<String> _filters = ['All Estates', 'Mountains', 'Beaches', 'Forests'];
 
   @override
   void initState() {
@@ -75,208 +112,261 @@ class _ExploreTabState extends State<ExploreTab> {
       final data = await supabase.from('properties').select().eq('status', 'Available').order('created_at', ascending: false);
       if (mounted) setState(() { _properties = data; _isLoading = false; });
     } catch (error) {
-      if (mounted) setState(() { _isLoading = false; });
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text('Countryside Heaven', style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
-        backgroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF2E7D32)))
-          : RefreshIndicator(
-              onRefresh: _fetchProperties,
-              color: const Color(0xFF2E7D32),
-              child: ListView.builder(
-                padding: const EdgeInsets.all(20),
-                itemCount: _properties.length,
-                itemBuilder: (context, index) {
-                  final property = _properties[index];
-                  final imageUrl = property['image_url'] as String?;
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 24),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    clipBehavior: Clip.antiAlias,
-                    elevation: 5,
-                    shadowColor: Colors.black26,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+      backgroundColor: appBgColor,
+      body: SafeArea(
+        bottom: false,
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            // --- CUSTOM HEADER ---
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        SizedBox(
-                          height: 200,
-                          child: imageUrl != null && imageUrl.isNotEmpty
-                              ? Image.network(imageUrl, fit: BoxFit.cover)
-                              : Container(color: Colors.green[50], child: const Icon(Icons.landscape, size: 80, color: Color(0xFF2E7D32))),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(property['name'] ?? 'Property', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  const Icon(Icons.location_on, size: 16, color: Colors.grey),
-                                  const SizedBox(width: 4),
-                                  Text(property['location'] ?? 'Location', style: TextStyle(color: Colors.grey[700])),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      const Text('Fraction Price', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                                      Text(property['price'] ?? 'Contact us', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
-                                    ],
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enquiry sent to Sales Team!')));
-                                    },
-                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.black, foregroundColor: Colors.white),
-                                    child: const Text('Enquire'),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
+                        // Avatar
+                        const CircleAvatar(radius: 24, backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=11')),
+                        // Action Icons
+                        Row(
+                          children: [
+                            _buildCircleButton(Icons.notifications_none_rounded),
+                            const SizedBox(width: 12),
+                            _buildCircleButton(Icons.search_rounded),
+                          ],
+                        )
                       ],
                     ),
-                  );
-                },
+                    const SizedBox(height: 32),
+                    const Text(
+                      'Experience\nLuxury Stays.',
+                      style: TextStyle(fontSize: 36, fontWeight: FontWeight.w600, height: 1.1, color: textPrimary, letterSpacing: -1),
+                    ),
+                    const SizedBox(height: 24),
+                    // Filters
+                    SizedBox(
+                      height: 48,
+                      child: ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        itemCount: _filters.length,
+                        itemBuilder: (context, index) {
+                          final filter = _filters[index];
+                          final isSelected = filter == _selectedFilter;
+                          return GestureDetector(
+                            onTap: () => setState(() => _selectedFilter = filter),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              margin: const EdgeInsets.only(right: 12),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: isSelected ? darkButton : surfaceWhite,
+                                borderRadius: BorderRadius.circular(24),
+                                boxShadow: isSelected ? [BoxShadow(color: darkButton.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4))] : [],
+                              ),
+                              child: Row(
+                                children: [
+                                  if (filter == 'All Estates') ...[
+                                    Icon(Icons.business_rounded, size: 18, color: isSelected ? Colors.white : textPrimary),
+                                    const SizedBox(width: 8),
+                                  ],
+                                  Text(
+                                    filter,
+                                    style: TextStyle(color: isSelected ? Colors.white : textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-    );
-  }
-}
 
-// ==========================================
-// TAB 2: PORTFOLIO (Demonstration)
-// ==========================================
-class PortfolioTab extends StatelessWidget {
-  const PortfolioTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('My Portfolio'), backgroundColor: Colors.white, foregroundColor: Colors.black, elevation: 0),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF2E7D32), Color(0xFF1B5E20)]), borderRadius: BorderRadius.circular(20)),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Total Portfolio Value', style: TextStyle(color: Colors.white70, fontSize: 16)),
-                SizedBox(height: 8),
-                Text('₹13.80L', style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.bold)),
-                SizedBox(height: 16),
-                Text('Total Fractions Owned: 2', style: TextStyle(color: Colors.white)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text('Your Assets', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: ClipRRect(borderRadius: BorderRadius.circular(8), child: Container(width: 60, height: 60, color: Colors.grey[300], child: const Icon(Icons.holiday_village))),
-            title: const Text('Luxury Duplex Villa, Shimla', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('1 Fraction • Purchased at ₹6.90L'),
-            trailing: const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text('₹7.20L', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.green)),
-                Text('+4.3%', style: TextStyle(color: Colors.green, fontSize: 12)),
-              ],
-            ),
-          )
-        ],
+            // --- PROPERTIES LIST ---
+            if (_isLoading)
+              const SliverFillRemaining(child: Center(child: CircularProgressIndicator(color: darkButton)))
+            else
+              SliverPadding(
+                padding: const EdgeInsets.only(left: 24, right: 24, bottom: 100),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final prop = _properties[index];
+                      // Use a staggered animation based on index
+                      return TweenAnimationBuilder(
+                        tween: Tween<double>(begin: 0, end: 1),
+                        duration: Duration(milliseconds: 600 + (index * 100)),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, value, child) {
+                          return Transform.translate(
+                            offset: Offset(0, 50 * (1 - value)),
+                            child: Opacity(opacity: value, child: child),
+                          );
+                        },
+                        child: _buildPropertyCard(context, prop, index),
+                      );
+                    },
+                    childCount: _properties.length,
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
-}
 
-// ==========================================
-// TAB 3: BOOKINGS (Demonstration)
-// ==========================================
-class BookingTab extends StatefulWidget {
-  const BookingTab({super.key});
+  Widget _buildCircleButton(IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: const BoxDecoration(color: surfaceWhite, shape: BoxShape.circle),
+      child: Icon(icon, color: textPrimary, size: 22),
+    );
+  }
 
-  @override
-  State<BookingTab> createState() => _BookingTabState();
-}
+  Widget _buildPropertyCard(BuildContext context, Map<String, dynamic> prop, int index) {
+    final imageUrl = prop['image_url'] as String?;
+    final heroTag = 'property_image_${prop['id'] ?? index}'; // Unique tag for fluid transition
 
-class _BookingTabState extends State<BookingTab> {
-  DateTime _focusedDay = DateTime.now();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Holiday Bookings'), backgroundColor: Colors.white, foregroundColor: Colors.black, elevation: 0),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+    return GestureDetector(
+      onTap: () {
+        // Fluid transition to detail screen
+        Navigator.of(context).push(PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 600),
+          reverseTransitionDuration: const Duration(milliseconds: 400),
+          pageBuilder: (context, animation, secondaryAnimation) {
+            return FadeTransition(
+              opacity: animation,
+              child: PropertyDetailScreen(property: prop, heroTag: heroTag),
+            );
+          },
+        ));
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 24),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: surfaceWhite,
+          borderRadius: BorderRadius.circular(32),
+          boxShadow: [BoxShadow(color: textPrimary.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 10))],
+        ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(color: Colors.blue[50], borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.blue[200]!)),
-              child: const Row(
-                children: [
-                  Icon(Icons.info_outline, color: Colors.blue),
-                  SizedBox(width: 12),
-                  Expanded(child: Text('You have 7 nights remaining this quarter. Remember to book 90 days in advance!', style: TextStyle(color: Colors.blue))),
-                ],
-              ),
+            // IMAGE SECTION
+            Stack(
+              children: [
+                Hero(
+                  tag: heroTag,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: SizedBox(
+                      height: 200,
+                      width: double.infinity,
+                      child: imageUrl != null && imageUrl.isNotEmpty
+                          ? Image.network(imageUrl, fit: BoxFit.cover)
+                          : Container(color: Colors.grey[200], child: const Icon(Icons.landscape, color: Colors.grey)),
+                    ),
+                  ),
+                ),
+                // Badges overlay
+                Positioned(
+                  top: 16, left: 16,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        color: Colors.white.withOpacity(0.3),
+                        child: const Text('15% YIELD', style: TextStyle(color: textPrimary, fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 16, right: 16,
+                  child: Row(
+                    children: [
+                      _buildGlassIcon(Icons.share_outlined),
+                      const SizedBox(width: 8),
+                      _buildGlassIcon(Icons.favorite_border_rounded),
+                    ],
+                  ),
+                )
+              ],
             ),
-            const SizedBox(height: 24),
-            const Text('Select Dates', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
-            // Mock Calendar UI
-            Container(
-              decoration: BoxDecoration(border: Border.all(color: Colors.grey[300]!), borderRadius: BorderRadius.circular(12)),
-              child: CalendarDatePicker(
-                initialDate: _focusedDay,
-                firstDate: DateTime.now(),
-                lastDate: DateTime.now().add(const Duration(days: 365)),
-                onDateChanged: (date) {
-                  setState(() => _focusedDay = date);
-                },
-              ),
-            ),
-            const SizedBox(height: 24),
+            // DETAILS SECTION
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dates Booked!'))),
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2E7D32), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16)),
-                    child: const Text('Book Stay'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(prop['name'] ?? 'Luxury Estate', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: textPrimary, letterSpacing: -0.5)),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on_outlined, size: 14, color: textSecondary),
+                          const SizedBox(width: 4),
+                          Text(prop['location'] ?? 'Location', style: const TextStyle(color: textSecondary, fontSize: 13)),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(prop['price'] ?? '₹0', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: textPrimary)),
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 2, left: 4),
+                            child: Text('/ Fraction', style: TextStyle(fontSize: 12, color: textSecondary)),
+                          ),
+                          const SizedBox(width: 16),
+                          Row(
+                            children: const [
+                              Icon(Icons.star_rounded, color: accentGold, size: 16),
+                              SizedBox(width: 4),
+                              Text('4.8', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                            ],
+                          )
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Amenities Icons
+                      Row(
+                        children: [
+                          _buildAmenityIcon(Icons.bed_rounded, '2 bed'),
+                          const SizedBox(width: 16),
+                          _buildAmenityIcon(Icons.bathtub_outlined, '2 bath'),
+                          const SizedBox(width: 16),
+                          _buildAmenityIcon(Icons.square_foot_rounded, '1200 sqft'),
+                        ],
+                      )
+                    ],
                   ),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Dates listed for rent!'))),
-                    style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16), foregroundColor: const Color(0xFF2E7D32), side: const BorderSide(color: Color(0xFF2E7D32))),
-                    child: const Text('Rent Out'),
-                  ),
-                ),
+                // Circular Arrow Button
+                Container(
+                  width: 50, height: 50,
+                  decoration: const BoxDecoration(color: darkButton, shape: BoxShape.circle),
+                  child: const Icon(Icons.arrow_forward_rounded, color: Colors.white),
+                )
               ],
             )
           ],
@@ -284,83 +374,274 @@ class _BookingTabState extends State<BookingTab> {
       ),
     );
   }
-}
 
-// ==========================================
-// TAB 4: CO-OWNERS (Demonstration)
-// ==========================================
-class CoOwnersTab extends StatelessWidget {
-  const CoOwnersTab({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Community'), backgroundColor: Colors.white, foregroundColor: Colors.black, elevation: 0),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          const Text('Your Co-owners (Shimla Duplex)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          _buildOwner('Aarav Sharma', 'Invested Oct 2025'),
-          _buildOwner('Priya Patel', 'Invested Jan 2026'),
-          _buildOwner('Rahul Singh', 'Invested Feb 2026'),
-        ],
+  Widget _buildGlassIcon(IconData icon) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          color: Colors.white.withOpacity(0.3),
+          child: Icon(icon, color: textPrimary, size: 18),
+        ),
       ),
     );
   }
 
-  Widget _buildOwner(String name, String date) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: ListTile(
-        leading: CircleAvatar(backgroundColor: const Color(0xFF2E7D32), child: Text(name[0], style: const TextStyle(color: Colors.white))),
-        title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(date),
-      ),
+  Widget _buildAmenityIcon(IconData icon, String label) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: textSecondary),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(color: textSecondary, fontSize: 12)),
+      ],
     );
   }
 }
 
 // ==========================================
-// TAB 5: PROFILE & DOCS (Demonstration)
+// TAB 5: PROFILE
 // ==========================================
 class ProfileTab extends StatelessWidget {
   const ProfileTab({super.key});
 
   @override
   Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: appBgColor,
+      body: Center(child: Text('Profile View', style: TextStyle(fontSize: 20, color: textPrimary))),
+    );
+  }
+}
+
+// ==========================================
+// NEW: IMMERSIVE PROPERTY DETAIL SCREEN
+// ==========================================
+class PropertyDetailScreen extends StatelessWidget {
+  final Map<String, dynamic> property;
+  final String heroTag;
+
+  const PropertyDetailScreen({super.key, required this.property, required this.heroTag});
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrl = property['image_url'] as String?;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile'), backgroundColor: Colors.white, foregroundColor: Colors.black, elevation: 0),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
+      backgroundColor: appBgColor,
+      body: Stack(
         children: [
-          const CircleAvatar(radius: 50, backgroundColor: Colors.grey, child: Icon(Icons.person, size: 50, color: Colors.white)),
-          const SizedBox(height: 16),
-          const Text('Rahul', textAlign: TextAlign.center, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          const Text('Member since 2026', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
-          const SizedBox(height: 32),
-          ListTile(
-            leading: const Icon(Icons.description),
-            title: const Text('My Documents (KYC)'),
-            trailing: const Icon(Icons.upload_file, color: Color(0xFF2E7D32)),
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Document upload coming soon'))),
+          // 1. SCROLLABLE CONTENT
+          SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top Hero Image Region
+                Stack(
+                  alignment: Alignment.bottomCenter,
+                  children: [
+                    Hero(
+                      tag: heroTag,
+                      child: SizedBox(
+                        height: 400,
+                        width: double.infinity,
+                        child: imageUrl != null && imageUrl.isNotEmpty
+                            ? Image.network(imageUrl, fit: BoxFit.cover)
+                            : Container(color: Colors.grey[300]),
+                      ),
+                    ),
+                    // Gradient overlay for text readability
+                    Container(
+                      height: 200,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [appBgColor, appBgColor.withOpacity(0.0)],
+                        ),
+                      ),
+                    ),
+                    // Mini Carousel Overlapping Image
+                    Positioned(
+                      bottom: 24,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildMiniImage(imageUrl),
+                          const SizedBox(width: 8),
+                          _buildMiniImage(imageUrl),
+                          const SizedBox(width: 8),
+                          _buildMiniImage(imageUrl),
+                        ],
+                      ),
+                    )
+                  ],
+                ),
+                
+                // Details Card
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+                  decoration: const BoxDecoration(
+                    color: appBgColor,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(property['name'] ?? 'Luxury Estate', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w600, color: textPrimary, letterSpacing: -0.5)),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(property['price'] ?? '₹0', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: textPrimary)),
+                          Row(
+                            children: [
+                              const Icon(Icons.location_on_outlined, size: 16, color: textSecondary),
+                              const SizedBox(width: 4),
+                              Text(property['location'] ?? 'Location', style: const TextStyle(color: textSecondary, fontSize: 14)),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+                      
+                      // Big Amenity Blocks
+                      Row(
+                        children: [
+                          Expanded(child: _buildBigAmenityBlock(Icons.king_bed_rounded, '2 King Beds')),
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildBigAmenityBlock(Icons.wifi_rounded, 'Free wi-fi')),
+                          const SizedBox(width: 12),
+                          Expanded(child: _buildBigAmenityBlock(Icons.tv_rounded, 'HD TV')),
+                        ],
+                      ),
+                      const SizedBox(height: 32),
+                      
+                      // Description
+                      const Text('Description', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: textPrimary)),
+                      const SizedBox(height: 12),
+                      Text(
+                        'This stunning fractional ownership property offers luxury stays with fine dining, a spa, and elegant event spaces for unforgettable memories. Invest today and unlock 28 complimentary nights every year across our global portfolio.',
+                        style: TextStyle(fontSize: 14, color: textSecondary.withOpacity(0.8), height: 1.6),
+                      ),
+                      const SizedBox(height: 120), // Padding for the bottom sticky button
+                    ],
+                  ),
+                )
+              ],
+            ),
           ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.help_outline),
-            title: const Text('Support'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {},
+
+          // 2. TOP ACTION BUTTONS (Floating)
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Back Button
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          color: Colors.white.withOpacity(0.4),
+                          child: const Icon(Icons.arrow_back_ios_new_rounded, color: textPrimary, size: 20),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Share & Percent Icons
+                  Row(
+                    children: [
+                      _buildFloatingTopIcon(Icons.ios_share_rounded),
+                      const SizedBox(width: 12),
+                      _buildFloatingTopIcon(Icons.percent_rounded),
+                    ],
+                  )
+                ],
+              ),
+            ),
           ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text('Logout', style: TextStyle(color: Colors.red)),
-            onTap: () async {
-              await Supabase.instance.client.auth.signOut();
-              if (context.mounted) Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
-            },
-          ),
+
+          // 3. STICKY BOTTOM BUTTON
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [appBgColor, appBgColor.withOpacity(0.0)],
+                )
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                height: 64,
+                child: ElevatedButton(
+                  onPressed: () {},
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: darkButton,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(32)),
+                    elevation: 10,
+                    shadowColor: darkButton.withOpacity(0.4),
+                  ),
+                  child: const Text('Invest Now', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ),
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFloatingTopIcon(IconData icon) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          color: Colors.white.withOpacity(0.4),
+          child: Icon(icon, color: textPrimary, size: 20),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMiniImage(String? imageUrl) {
+    return Container(
+      width: 70, height: 50,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white, width: 2),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
+        image: imageUrl != null && imageUrl.isNotEmpty
+            ? DecorationImage(image: NetworkImage(imageUrl), fit: BoxFit.cover)
+            : null,
+      ),
+    );
+  }
+
+  Widget _buildBigAmenityBlock(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      decoration: BoxDecoration(
+        color: surfaceWhite,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: textPrimary.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: textPrimary, size: 28),
+          const SizedBox(height: 8),
+          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textPrimary)),
         ],
       ),
     );
