@@ -1,12 +1,8 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:minio/minio.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // Added for .env security
+import 'package:flutter/services.dart';
 
 class AddPropertyScreen extends StatefulWidget {
-  const AddPropertyScreen({super.key});
+  const AddPropertyScreen({Key? key}) : super(key: key);
 
   @override
   State<AddPropertyScreen> createState() => _AddPropertyScreenState();
@@ -15,213 +11,266 @@ class AddPropertyScreen extends StatefulWidget {
 class _AddPropertyScreenState extends State<AddPropertyScreen> {
   final _formKey = GlobalKey<FormState>();
   
-  final _nameController = TextEditingController();
-  final _locationController = TextEditingController();
-  final _priceController = TextEditingController();
-  
-  String _selectedStatus = 'Available';
-  bool _isLoading = false;
+  final Color bgLight = const Color(0xFFF7F7F9);
+  final Color vibrantAccent = const Color(0xFFFF5E5E);
+  final Color textDark = const Color(0xFF111111);
 
-  // --- IMAGE PICKING VARIABLES ---
-  XFile? _selectedImage;
-  Uint8List? _imageBytes; // Required for web image preview
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _valueController = TextEditingController();
+  final TextEditingController _fractionsController = TextEditingController();
 
-  final supabase = Supabase.instance.client;
+  double _calculatedFractionPrice = 0.0;
 
-  // Function to pick an image from the computer/phone
-  Future<void> _pickImage() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-    
-    if (image != null) {
-      final bytes = await image.readAsBytes();
-      setState(() {
-        _selectedImage = image;
-        _imageBytes = bytes;
-      });
-    }
+  @override
+  void initState() {
+    super.initState();
+    // Auto-calculate the fraction price when user types
+    _valueController.addListener(_calculatePrice);
+    _fractionsController.addListener(_calculatePrice);
   }
 
-  // Function to save everything
-  Future<void> _saveProperty() async {
-    if (_formKey.currentState!.validate()) {
-      if (_selectedImage == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please select an image first!'), backgroundColor: Colors.red),
-        );
-        return;
+  void _calculatePrice() {
+    final value = double.tryParse(_valueController.text.replaceAll(',', '')) ?? 0.0;
+    final fractions = int.tryParse(_fractionsController.text) ?? 0;
+    
+    setState(() {
+      if (fractions > 0) {
+        _calculatedFractionPrice = value / fractions;
+      } else {
+        _calculatedFractionPrice = 0.0;
       }
-
-      setState(() {
-        _isLoading = true;
-      });
-
-      try {
-        print("👀 HERE IS WHAT FLUTTER SEES IN THE ENV FILE: ${dotenv.env}");
-        // --- SECURELY LOADING R2 DETAILS FROM .ENV ---
-        final String r2Endpoint = dotenv.env['R2_ENDPOINT'] ?? ''; 
-        final String r2AccessKey = dotenv.env['R2_ACCESS_KEY'] ?? '';
-        final String r2SecretKey = dotenv.env['R2_SECRET_KEY'] ?? '';
-        final String r2BucketName = dotenv.env['R2_BUCKET_NAME'] ?? '';
-        final String r2PublicUrl = dotenv.env['R2_PUBLIC_URL'] ?? ''; 
-        // ---------------------------------------------
-
-        // Failsafe in case the .env file wasn't loaded properly
-        if (r2Endpoint.isEmpty || r2AccessKey.isEmpty) {
-          throw Exception("Missing Cloudflare R2 credentials in .env file");
-        }
-
-        // 1. Setup Minio (R2 connection) using the secure keys
-        final minio = Minio(
-          endPoint: r2Endpoint,
-          accessKey: r2AccessKey,
-          secretKey: r2SecretKey,
-          region: 'auto',
-        );
-
-        // 2. Create a unique file name to prevent overwriting
-        final fileName = '${DateTime.now().millisecondsSinceEpoch}_${_selectedImage!.name}';
-
-        // 3. Upload the image to Cloudflare R2
-        // 3. Upload the image to Cloudflare R2
-        await minio.putObject(
-          r2BucketName,
-          fileName,
-          Stream.value(_imageBytes!),
-          size: _imageBytes!.length, // <-- ADD "size:" RIGHT HERE
-          metadata: {'content-type': 'image/jpeg'}, 
-        );
-
-        // 4. Create the final public URL
-        final finalImageUrl = '$r2PublicUrl/$fileName';
-
-        // 5. Save the property text AND the image link to Supabase
-        await supabase.from('properties').insert({
-          'name': _nameController.text.trim(),
-          'location': _locationController.text.trim(),
-          'price': _priceController.text.trim(),
-          'status': _selectedStatus,
-          'image_url': finalImageUrl, 
-        });
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Property added successfully! 🎉'), backgroundColor: Colors.green),
-          );
-          Navigator.of(context).pop(true);
-        }
-      } catch (error) {
-        print("Upload Error: $error");
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $error'), backgroundColor: Colors.red),
-          );
-        }
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
-      }
-    }
+    });
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _locationController.dispose();
-    _priceController.dispose();
+    _titleController.dispose();
+    _valueController.dispose();
+    _fractionsController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: bgLight,
       appBar: AppBar(
-        title: const Text('Add New Property'),
-        backgroundColor: Colors.red[800],
-        foregroundColor: Colors.white,
+        backgroundColor: bgLight,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: textDark),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text('New Asset 🚀', style: TextStyle(color: textDark, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: -0.5)),
+        centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // --- IMAGE UPLOAD PREVIEW AREA ---
-              GestureDetector(
-                onTap: _pickImage,
-                child: Container(
-                  height: 200,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[400]!),
-                    image: _imageBytes != null 
-                      ? DecorationImage(
-                          image: MemoryImage(_imageBytes!), // Shows the selected image
-                          fit: BoxFit.cover,
-                        )
-                      : null,
-                  ),
-                  child: _imageBytes == null
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.add_photo_alternate, size: 50, color: Colors.grey[600]),
-                            const SizedBox(height: 8),
-                            Text('Tap to upload an image', style: TextStyle(color: Colors.grey[600])),
-                          ],
-                        )
-                      : null,
+      body: TweenAnimationBuilder(
+        tween: Tween<double>(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeOutBack,
+        builder: (context, double value, child) {
+          return Opacity(
+            opacity: value.clamp(0.0, 1.0),
+            child: Transform.translate(
+              offset: Offset(0, 30 * (1 - value)),
+              child: child,
+            ),
+          );
+        },
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Image Upload Placeholder
+                _buildImageUploader(),
+                const SizedBox(height: 32),
+
+                // Inputs
+                _buildInputLabel('Asset Name'),
+                _buildTextField(
+                  controller: _titleController,
+                  hint: 'e.g. Sunset Boulevard Villa',
+                  icon: Icons.landscape_rounded,
                 ),
-              ),
-              const SizedBox(height: 24),
+                const SizedBox(height: 24),
 
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: 'Property Name', border: OutlineInputBorder(), prefixIcon: Icon(Icons.holiday_village)),
-                validator: (value) => value == null || value.isEmpty ? 'Please enter a name' : null,
-              ),
-              const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildInputLabel('Total Value (\$)'),
+                          _buildTextField(
+                            controller: _valueController,
+                            hint: '1,000,000',
+                            icon: Icons.attach_money_rounded,
+                            isNumber: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildInputLabel('Total Fractions'),
+                          _buildTextField(
+                            controller: _fractionsController,
+                            hint: '100',
+                            icon: Icons.pie_chart_rounded,
+                            isNumber: true,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
 
-              TextFormField(
-                controller: _locationController,
-                decoration: const InputDecoration(labelText: 'Location', border: OutlineInputBorder(), prefixIcon: Icon(Icons.location_on)),
-                validator: (value) => value == null || value.isEmpty ? 'Please enter a location' : null,
-              ),
-              const SizedBox(height: 16),
+                // Smart Auto-Calculation Card
+                if (_calculatedFractionPrice > 0)
+                  TweenAnimationBuilder(
+                    tween: Tween<double>(begin: 0, end: 1),
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeOutBack,
+                    builder: (context, double val, child) {
+                      return Transform.scale(scale: val, child: child);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: textDark,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [BoxShadow(color: textDark.withOpacity(0.2), blurRadius: 20, offset: const Offset(0, 10))],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Price per Fraction', style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w600)),
+                          Text(
+                            '\$${_calculatedFractionPrice.toStringAsFixed(2)}',
+                            style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.w900),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
-              TextFormField(
-                controller: _priceController,
-                decoration: const InputDecoration(labelText: 'Price', border: OutlineInputBorder(), prefixIcon: Icon(Icons.currency_rupee)),
-                validator: (value) => value == null || value.isEmpty ? 'Please enter a price' : null,
-              ),
-              const SizedBox(height: 16),
+                const SizedBox(height: 48),
 
-              DropdownButtonFormField<String>(
-                value: _selectedStatus,
-                decoration: const InputDecoration(labelText: 'Status', border: OutlineInputBorder(), prefixIcon: Icon(Icons.info_outline)),
-                items: ['Available', 'Coming Soon', 'Sold Out'].map((String status) => DropdownMenuItem(value: status, child: Text(status))).toList(),
-                onChanged: (String? newValue) {
-                  if (newValue != null) setState(() => _selectedStatus = newValue);
-                },
-              ),
-              const SizedBox(height: 32),
-
-              ElevatedButton(
-                onPressed: _isLoading ? null : _saveProperty,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red[800], foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16)),
-                child: _isLoading 
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white))
-                  : const Text('Save Property with Image', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-            ],
+                // Big Launch Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 64,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (_formKey.currentState!.validate()) {
+                        // TODO: Save to Provider/Supabase
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Asset Launched Successfully! 🎉', style: TextStyle(fontWeight: FontWeight.bold)),
+                            backgroundColor: vibrantAccent,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                        );
+                        Navigator.pop(context);
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: vibrantAccent,
+                      foregroundColor: Colors.white,
+                      elevation: 10,
+                      shadowColor: vibrantAccent.withOpacity(0.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                    child: const Text('Launch Asset 🚀', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                  ),
+                ),
+                const SizedBox(height: 40),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildImageUploader() {
+    return Container(
+      height: 160,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: Colors.grey.shade300, width: 2, style: BorderStyle.solid), // In a real app, use dotted border package
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: bgLight, shape: BoxShape.circle),
+            child: Icon(Icons.add_a_photo_rounded, color: textDark, size: 32),
+          ),
+          const SizedBox(height: 12),
+          Text('Upload Cover Image', style: TextStyle(color: textDark, fontWeight: FontWeight.w700, fontSize: 16)),
+          Text('High-res photos sell faster', style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInputLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8, left: 4),
+      child: Text(label, style: TextStyle(fontWeight: FontWeight.w700, color: textDark, fontSize: 14)),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    bool isNumber = false,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: isNumber ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+      inputFormatters: isNumber ? [FilteringTextInputFormatter.allow(RegExp(r'[0-9.]'))] : [],
+      style: TextStyle(fontWeight: FontWeight.w600, color: textDark, fontSize: 16),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: Colors.grey.shade400, fontWeight: FontWeight.w500),
+        prefixIcon: Icon(icon, color: Colors.grey.shade500),
+        filled: true,
+        fillColor: Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: BorderSide(color: vibrantAccent, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(20),
+          borderSide: const BorderSide(color: Colors.red, width: 2),
+        ),
+      ),
+      validator: (value) {
+        if (value == null || value.isEmpty) return 'Required';
+        return null;
+      },
     );
   }
 }
