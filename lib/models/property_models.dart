@@ -39,9 +39,16 @@ class UserDocument {
   final String id;
   final String userId;
   final String fileName;
+  final String? fileUrl; // Stores the R2 public link
   String status; 
 
-  UserDocument({required this.id, required this.userId, required this.fileName, this.status = 'pending'});
+  UserDocument({
+    required this.id, 
+    required this.userId, 
+    required this.fileName, 
+    this.fileUrl, 
+    this.status = 'pending'
+  });
 }
 
 class Booking {
