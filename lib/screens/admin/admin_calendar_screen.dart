@@ -223,86 +223,94 @@ class _AdminCalendarScreenState extends State<AdminCalendarScreen> {
   void _showBookingDetailsSheet(BuildContext context, Booking booking) {
     final isLiving = booking.type == 'living';
     final typeColor = isLiving ? livingColor : rentingColor;
+    bool isCancelling = false; // Loading state
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: typeColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: Text(isLiving ? 'INVESTOR LIVING' : 'RENTING OUT', style: TextStyle(color: typeColor, fontWeight: FontWeight.w900, fontSize: 12))),
-                Text('${booking.startDate.day}/${booking.startDate.month} - ${booking.endDate.day}/${booking.endDate.month}', style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.bold, fontSize: 14))
-              ],
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: const Color(0xFFF7F7F9), borderRadius: BorderRadius.circular(16)), child: Icon(isLiving ? Icons.home_rounded : Icons.key_rounded, color: textDark, size: 32)),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(booking.unitName ?? 'Unknown Unit', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: textDark)),
-                      const SizedBox(height: 4),
-                      Text(booking.fractionName ?? 'Unknown Fraction', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600, fontSize: 16)),
-                    ],
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), decoration: BoxDecoration(color: typeColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)), child: Text(isLiving ? 'INVESTOR LIVING' : 'RENTING OUT', style: TextStyle(color: typeColor, fontWeight: FontWeight.w900, fontSize: 12))),
+                    Text('${booking.startDate.day}/${booking.startDate.month} - ${booking.endDate.day}/${booking.endDate.month}', style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.bold, fontSize: 14))
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: const Color(0xFFF7F7F9), borderRadius: BorderRadius.circular(16)), child: Icon(isLiving ? Icons.home_rounded : Icons.key_rounded, color: textDark, size: 32)),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(booking.unitName ?? 'Unknown Unit', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: textDark)),
+                          const SizedBox(height: 4),
+                          Text(booking.fractionName ?? 'Unknown Fraction', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600, fontSize: 16)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Divider()),
+                Row(
+                  children: [
+                    CircleAvatar(radius: 20, backgroundColor: textDark.withOpacity(0.1), child: const Icon(Icons.person, size: 20, color: textDark)),
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(booking.isOutsideBooking ? 'Outside Guest' : 'Booked by Investor', style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.bold)),
+                        Text(booking.isOutsideBooking ? (booking.guestName ?? 'Unknown') : (booking.userName ?? 'Unknown'), style: const TextStyle(color: textDark, fontWeight: FontWeight.w900, fontSize: 18)),
+                      ],
+                    )
+                  ],
+                ),
+                const SizedBox(height: 32),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: isCancelling ? null : () async {
+                      setState(() => isCancelling = true);
+                      try {
+                        await Provider.of<PropertyProvider>(context, listen: false).deleteBooking(booking.id);
+                        if (context.mounted) {
+                          Navigator.pop(context); 
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Booking Cancelled.'), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating));
+                        }
+                      } catch (e) {
+                        setState(() => isCancelling = false);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating));
+                        }
+                      }
+                    },
+                    icon: isCancelling ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(color: Colors.red, strokeWidth: 2)) : const Icon(Icons.cancel_rounded, color: Colors.red),
+                    label: Text(isCancelling ? 'Cancelling...' : 'Cancel Booking', style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.red, width: 2),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
                   ),
                 ),
+                const SizedBox(height: 16),
               ],
             ),
-            const Padding(padding: EdgeInsets.symmetric(vertical: 24), child: Divider()),
-            Row(
-              children: [
-                CircleAvatar(radius: 20, backgroundColor: textDark.withOpacity(0.1), child: const Icon(Icons.person, size: 20, color: textDark)),
-                const SizedBox(width: 16),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(booking.isOutsideBooking ? 'Outside Guest' : 'Booked by Investor', style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.bold)),
-                    Text(booking.isOutsideBooking ? (booking.guestName ?? 'Unknown') : (booking.userName ?? 'Unknown'), style: const TextStyle(color: textDark, fontWeight: FontWeight.w900, fontSize: 18)),
-                  ],
-                )
-              ],
-            ),
-            const SizedBox(height: 32),
-            // --- NEW: Cancel Booking Button ---
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () async {
-                  try {
-                    await Provider.of<PropertyProvider>(context, listen: false).deleteBooking(booking.id);
-                    Navigator.pop(context); // Close the sheet
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Booking Cancelled.'), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating));
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating));
-                  }
-                },
-                icon: const Icon(Icons.cancel_rounded, color: Colors.red),
-                label: const Text('Cancel Booking', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.red, width: 2),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
+          );
+        }
       ),
     );
   }
-
-  // --- BUSINESS LOGIC VALIDATORS ---
 
   bool _isPeak1(DateTime d) => (d.month == 4 && d.day >= 20) || (d.month > 4 && d.month < 7) || (d.month == 7 && d.day <= 15);
   bool _isPeak2(DateTime d) => (d.month == 12 && d.day >= 16) || (d.month == 1 && d.day <= 5);
@@ -330,19 +338,18 @@ class _AdminCalendarScreenState extends State<AdminCalendarScreen> {
     final guestNameCtrl = TextEditingController();
     
     String? errorMessage;
+    bool isSubmitting = false; // Loading state
 
     showModalBottomSheet(
       context: context,
-      isScrollControlled: true, // Allows the sheet to go near full-screen if needed
+      isScrollControlled: true, 
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
             return Padding(
-              // Keep the keyboard padding on the very outside
               padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-              // FIX: Wrapped the entire content in a SingleChildScrollView!
               child: SingleChildScrollView(
                 padding: const EdgeInsets.only(left: 24, right: 24, top: 32, bottom: 24),
                 child: Column(
@@ -466,7 +473,7 @@ class _AdminCalendarScreenState extends State<AdminCalendarScreen> {
                       height: 56,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(backgroundColor: textDark, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
-                        onPressed: () {
+                        onPressed: isSubmitting ? null : () async {
                           setState(() => errorMessage = null);
 
                           if (dateRange == null || selectedUnit == null || selectedFraction == null) {
@@ -553,8 +560,10 @@ class _AdminCalendarScreenState extends State<AdminCalendarScreen> {
                             }
                           }
 
+                          setState(() => isSubmitting = true);
+
                           final newBooking = Booking(
-                            id: '', 
+                            id: '', // Supabase auto-generates the UUID
                             unitId: selectedUnit!.id, 
                             fractionId: selectedFraction!.id, 
                             userId: isOutside ? 'Outside Guest' : selectedInvestor!.id,
@@ -565,11 +574,22 @@ class _AdminCalendarScreenState extends State<AdminCalendarScreen> {
                             guestName: isOutside ? guestNameCtrl.text : null,
                           );
 
-                          propertyProvider.addBooking(newBooking);
-                          Navigator.pop(context); 
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Booking Confirmed! 🎉'), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating));
+                          try {
+                            await propertyProvider.addBooking(newBooking);
+                            if (context.mounted) {
+                              Navigator.pop(context); 
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Booking Confirmed! 🎉'), backgroundColor: Colors.green, behavior: SnackBarBehavior.floating));
+                            }
+                          } catch (e) {
+                            setState(() => isSubmitting = false);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating));
+                            }
+                          }
                         },
-                        child: const Text('Confirm Booking', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        child: isSubmitting
+                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+                          : const Text('Confirm Booking', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       ),
                     ),
                   ],

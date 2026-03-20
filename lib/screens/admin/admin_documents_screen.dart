@@ -35,17 +35,28 @@ class _AdminDocumentsScreenState extends State<AdminDocumentsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F9),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 100), // Clear space for nav bar
+        padding: const EdgeInsets.only(bottom: 100), 
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- NEW HEADER WITH INLINE BUTTON ---
+            // --- HEADER WITH DYNAMIC BACK BUTTON ---
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // 👉 NEW: Dynamic Back Button (Only shows if pushed from Dashboard)
+                  if (Navigator.canPop(context))
+                    Padding(
+                      padding: const EdgeInsets.only(right: 16.0, top: 4.0),
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back_ios_new_rounded, color: textDark),
+                        onPressed: () => Navigator.pop(context),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                      ),
+                    ),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

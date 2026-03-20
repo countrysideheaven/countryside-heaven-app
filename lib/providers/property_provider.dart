@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // <--- Handles .env variables
-import 'package:minio/minio.dart'; // <--- Connects to Cloudflare R2
+import 'package:flutter_dotenv/flutter_dotenv.dart'; 
+import 'package:minio/minio.dart'; 
 import '../models/property_models.dart';
 
 class PropertyProvider extends ChangeNotifier {
@@ -54,7 +54,15 @@ class PropertyProvider extends ChangeNotifier {
         );
       }).toList();
 
-      return Property(id: propMap['id'], name: propMap['name'], location: propMap['location'], units: units);
+      return Property(
+        id: propMap['id'], 
+        name: propMap['name'], 
+        location: propMap['location'],
+        description: propMap['description'] ?? '', 
+        // Ensure we handle the JSON array of URLs correctly
+        imageUrls: propMap['image_urls'] != null ? List<String>.from(propMap['image_urls']) : [],
+        units: units
+      );
     }).toList();
   }
 
@@ -65,7 +73,7 @@ class PropertyProvider extends ChangeNotifier {
         id: doc['id'],
         userId: doc['users'] != null ? doc['users']['name'] : 'Unknown User',
         fileName: doc['file_name'],
-        fileUrl: doc['file_url'], // FETCH R2 URL FROM DB
+        fileUrl: doc['file_url'], 
         status: doc['status'],
       );
     }).toList();
@@ -85,60 +93,128 @@ class PropertyProvider extends ChangeNotifier {
     }).toList();
   }
 
-  // --- 🚀 CLOUDFLARE R2 UPLOAD LOGIC 🚀 ---
+  // ==========================================
+  // 🚀 CLOUDFLARE R2 UPLOAD LOGIC 🚀 
+  // ==========================================
+  
+  // ==========================================
+  // 🚀 CLOUDFLARE R2 UPLOAD LOGIC 🚀 
+  // ==========================================
+  
   Future<void> uploadAdminDocument(String userId, String documentName, Uint8List fileBytes, String extension) async {
     try {
       final uniqueFileName = '${userId}_${DateTime.now().millisecondsSinceEpoch}.$extension';
       
-      // 1. Grab variables from .env file (Change these names to perfectly match your .env file)
-      final accountId = dotenv.env['R2_ACCOUNT_ID']!; // E.g., '12345abcde...'
-      final accessKey = dotenv.env['R2_ACCESS_KEY_ID']!;
-      final secretKey = dotenv.env['R2_SECRET_ACCESS_KEY']!;
-      final bucketName = dotenv.env['R2_BUCKET_NAME']!;
-      final publicUrlBase = dotenv.env['R2_PUBLIC_DEV_URL'] ?? dotenv.env['R2_PUBLIC_URL']!; // E.g., 'https://pub-xxxx.r2.dev'
+      // 1. Match your EXACT .env keys
+      final r2Endpoint = dotenv.env['R2_ENDPOINT']; 
+      final accessKey = dotenv.env['R2_ACCESS_KEY'];
+      final secretKey = dotenv.env['R2_SECRET_KEY'];
+      final bucketName = dotenv.env['R2_BUCKET_NAME'];
+      final publicUrlBase = dotenv.env['R2_PUBLIC_URL'];
 
-      // Minio requires the endpoint without "https://"
-      final r2Endpoint = '$accountId.r2.cloudflarestorage.com'; 
+      if (r2Endpoint == null || accessKey == null || secretKey == null || bucketName == null || publicUrlBase == null) {
+        throw Exception("Missing one or more R2 variables in .env file.");
+      }
 
-      // 2. Initialize the Minio/R2 client
       final minio = Minio(
-        endPoint: r2Endpoint,
-        accessKey: accessKey,
-        secretKey: secretKey,
-        region: 'auto', // R2 requires 'auto' region
-        useSSL: true,
+        endPoint: r2Endpoint, // Using the full endpoint directly from .env
+        accessKey: accessKey, 
+        secretKey: secretKey, 
+        region: 'auto', 
+        useSSL: true
       );
 
-      // 3. Stream the file directly to your R2 bucket
-      await minio.putObject(
-        bucketName,
-        uniqueFileName,
-        Stream.value(fileBytes), 
-        size: fileBytes.length,
-      );
+      await minio.putObject(bucketName, uniqueFileName, Stream.value(fileBytes), size: fileBytes.length);
 
-      // 4. Build the final public URL
-      final String r2FileUrl = publicUrlBase.endsWith('/') 
-          ? '$publicUrlBase$uniqueFileName' 
-          : '$publicUrlBase/$uniqueFileName';
+      final String r2FileUrl = publicUrlBase.endsWith('/') ? '$publicUrlBase$uniqueFileName' : '$publicUrlBase/$uniqueFileName';
 
-      // 5. Save the record in Supabase (Auto-approved)
       await _supabase.from('documents').insert({
-        'user_id': userId,
-        'file_name': documentName,
-        'file_url': r2FileUrl,
-        'status': 'approved', 
+        'user_id': userId, 'file_name': documentName, 'file_url': r2FileUrl, 'status': 'approved', 
       });
       
-      await fetchData(); // Refresh the Vault UI
+      await fetchData(); 
     } catch (e) {
       debugPrint('🚨 Error uploading document to R2: $e');
       rethrow;
     }
   }
 
+// ---> NEW: Customer KYC Upload (Sets status to 'pending')
+  Future<void> uploadKycDocument(String userId, String documentName, Uint8List fileBytes, String extension) async {
+    try {
+      final cleanName = documentName.replaceAll(RegExp(r'[^a-zA-Z0-9.]'), '_');
+      final uniqueFileName = 'kyc/${userId}_${DateTime.now().millisecondsSinceEpoch}.$extension';
+      
+      final r2Endpoint = dotenv.env['R2_ENDPOINT']; 
+      final accessKey = dotenv.env['R2_ACCESS_KEY'];
+      final secretKey = dotenv.env['R2_SECRET_KEY'];
+      final bucketName = dotenv.env['R2_BUCKET_NAME'];
+      final publicUrlBase = dotenv.env['R2_PUBLIC_URL'];
+
+      if (r2Endpoint == null || accessKey == null || secretKey == null || bucketName == null || publicUrlBase == null) {
+        throw Exception("Missing one or more R2 variables in .env file.");
+      }
+
+      final minio = Minio(endPoint: r2Endpoint, accessKey: accessKey, secretKey: secretKey, region: 'auto', useSSL: true);
+
+      await minio.putObject(bucketName, uniqueFileName, Stream.value(fileBytes), size: fileBytes.length);
+
+      final String r2FileUrl = publicUrlBase.endsWith('/') ? '$publicUrlBase$uniqueFileName' : '$publicUrlBase/$uniqueFileName';
+
+      // Note: Status is 'pending' for Admin approval
+      await _supabase.from('documents').insert({
+        'user_id': userId, 'file_name': cleanName, 'file_url': r2FileUrl, 'status': 'pending', 
+      });
+      
+      await fetchData(); 
+    } catch (e) {
+      debugPrint('🚨 Error uploading KYC to R2: $e');
+      rethrow;
+    }
+  }
+
+
+  Future<String> uploadPropertyImage(Uint8List fileBytes, String originalFileName) async {
+    try {
+      final cleanName = originalFileName.replaceAll(RegExp(r'[^a-zA-Z0-9.]'), '_');
+      final uniqueFileName = 'properties/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
+      
+      // 1. Match your EXACT .env keys
+      final r2Endpoint = dotenv.env['R2_ENDPOINT']; 
+      final accessKey = dotenv.env['R2_ACCESS_KEY'];
+      final secretKey = dotenv.env['R2_SECRET_KEY'];
+      final bucketName = dotenv.env['R2_BUCKET_NAME'];
+      final publicUrlBase = dotenv.env['R2_PUBLIC_URL'];
+
+      // 2. Safe check so it tells us exactly what is wrong instead of a blind null error
+      if (r2Endpoint == null) throw Exception("Missing R2_ENDPOINT");
+      if (accessKey == null) throw Exception("Missing R2_ACCESS_KEY");
+      if (secretKey == null) throw Exception("Missing R2_SECRET_KEY");
+      if (bucketName == null) throw Exception("Missing R2_BUCKET_NAME");
+      if (publicUrlBase == null) throw Exception("Missing R2_PUBLIC_URL");
+
+      final minio = Minio(
+        endPoint: r2Endpoint, // Using the full endpoint directly from .env
+        accessKey: accessKey, 
+        secretKey: secretKey, 
+        region: 'auto', 
+        useSSL: true
+      );
+
+      // Upload to R2
+      await minio.putObject(bucketName, uniqueFileName, Stream.value(fileBytes), size: fileBytes.length);
+
+      // Construct and return the public URL
+      final String r2FileUrl = publicUrlBase.endsWith('/') ? '$publicUrlBase$uniqueFileName' : '$publicUrlBase/$uniqueFileName';
+      return r2FileUrl;
+    } catch (e) {
+      debugPrint('🚨 Error uploading property image to R2: $e');
+      rethrow;
+    }
+  }
   // --- CRUD Operations ---
-  Future<void> addProperty(String name, String location, int unitCount, double initialFractionPrice) async {
+  
+  Future<String> addProperty(String name, String location, int unitCount, double initialFractionPrice) async {
     final propResp = await _supabase.from('properties').insert({'name': name, 'location': location}).select().single();
     final String propertyId = propResp['id'];
     for (int i = 0; i < unitCount; i++) {
@@ -146,6 +222,28 @@ class PropertyProvider extends ChangeNotifier {
       await _supabase.from('fractions').insert(List.generate(11, (index) => {'unit_id': unitResp['id'], 'fraction_index': index + 1}));
     }
     await fetchData(); 
+    return propertyId; 
+  }
+
+  // ---> NEW: Updates the property in Supabase with the descriptions and the new R2 URLs
+  Future<void> updatePropertyExtraData(String propertyId, String description, List<String> imageUrls) async {
+    try {
+      // 1. Update Supabase Database
+      await _supabase.from('properties').update({
+        'description': description,
+        'image_urls': imageUrls, // Supabase automatically handles List<String> as a JSONB/Array column
+      }).eq('id', propertyId);
+
+      // 2. Update Local State to reflect immediately
+      final index = _properties.indexWhere((p) => p.id == propertyId);
+      if (index != -1) {
+        _properties[index].description = description;
+        _properties[index].imageUrls = imageUrls;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('🚨 Error updating property extra data: $e');
+    }
   }
 
   Future<void> addUnitToProperty(String propertyId, String customUnitName, double fractionPrice) async {

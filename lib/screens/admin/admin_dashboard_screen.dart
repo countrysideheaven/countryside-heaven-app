@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import '../add_property_screen.dart'; // Import for navigation
+import 'package:provider/provider.dart';
+
+import '../../providers/auth_provider.dart';
+import '../../providers/property_provider.dart';
+import '../../models/app_user.dart';
+
+import '../add_property_screen.dart'; 
 import 'add_user_screen.dart';
+import 'admin_documents_screen.dart';
+import 'admin_payouts_screen.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({Key? key}) : super(key: key);
@@ -11,10 +19,64 @@ class AdminDashboardScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final propertyProvider = Provider.of<PropertyProvider>(context);
+
+    // ==========================================
+    // 📊 LIVE DATA CALCULATIONS
+    // ==========================================
+    
+    // 1. Revenue & Sales
+    double totalRevenue = 0.0;
+    int soldFractions = 0;
+    int totalUnits = 0;
+
+    for (var prop in propertyProvider.properties) {
+      totalUnits += prop.units.length;
+      for (var unit in prop.units) {
+        for (var frac in unit.fractions) {
+          if (frac.ownerId != null) {
+            totalRevenue += unit.fractionPrice;
+            soldFractions++;
+          }
+        }
+      }
+    }
+
+    String revenueDisplay;
+    if (totalRevenue >= 1000000) {
+      revenueDisplay = '\$${(totalRevenue / 1000000).toStringAsFixed(1)}M';
+    } else if (totalRevenue >= 1000) {
+      revenueDisplay = '\$${(totalRevenue / 1000).toStringAsFixed(1)}K';
+    } else {
+      revenueDisplay = '\$${totalRevenue.toStringAsFixed(0)}';
+    }
+
+    // 2. Network Sizes
+    final directUsers = authProvider.getDownline('ADMIN123');
+    int agentCount = directUsers.where((u) => u.role != UserRole.customer).length;
+    
+    int clientCount = directUsers.where((u) => u.role == UserRole.customer).length;
+    for (var agent in directUsers.where((u) => u.role != UserRole.customer)) {
+      // Add clients sitting under the agents
+      clientCount += authProvider.getDownline(agent.myReferralCode).where((u) => u.role == UserRole.customer).length;
+    }
+
+    // 3. Dynamic Chart Data (Scales up visually as you sell more)
+    final double baseVal = soldFractions > 0 ? soldFractions.toDouble() : 1.0;
+    final List<FlSpot> dynamicSpots = [
+      FlSpot(0, baseVal * 0.2), 
+      FlSpot(1, baseVal * 0.5), 
+      FlSpot(2, baseVal * 0.4),
+      FlSpot(3, baseVal * 0.8), 
+      FlSpot(4, baseVal * 0.7), 
+      FlSpot(5, baseVal * 1.2),
+    ];
+
     return TweenAnimationBuilder(
       tween: Tween<double>(begin: 0, end: 1),
       duration: const Duration(milliseconds: 500),
-      curve: Curves.easeOutBack, // Bouncy intro
+      curve: Curves.easeOutBack, 
       builder: (context, double value, child) {
         return Opacity(
           opacity: value.clamp(0.0, 1.0),
@@ -25,7 +87,7 @@ class AdminDashboardScreen extends StatelessWidget {
         );
       },
       child: SingleChildScrollView(
-        padding: const EdgeInsets.only(left: 24, right: 24, top: 40, bottom: 100), // Extra bottom padding for mobile nav
+        padding: const EdgeInsets.only(left: 24, right: 24, top: 40, bottom: 100), 
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -36,20 +98,20 @@ class AdminDashboardScreen extends StatelessWidget {
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Hey Rahul 👋', style: TextStyle(fontSize: 20, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                    Text('Hey Admin 👋', style: TextStyle(fontSize: 20, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
                     Text('Dashboard ⚡️', style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: textDark, letterSpacing: -1)),
                   ],
                 ),
                 CircleAvatar(
                   radius: 28,
                   backgroundColor: vibrantAccent.withOpacity(0.2),
-                  child: Text('R', style: TextStyle(color: vibrantAccent, fontSize: 24, fontWeight: FontWeight.w900)),
+                  child: Text('A', style: TextStyle(color: vibrantAccent, fontSize: 24, fontWeight: FontWeight.w900)),
                 ),
               ],
             ),
             const SizedBox(height: 32),
 
-            // Quick Actions (Like a Zomato/Zepto category row)
+            // Quick Actions
             Text('Quick Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: textDark)),
             const SizedBox(height: 16),
             SingleChildScrollView(
@@ -74,7 +136,6 @@ class AdminDashboardScreen extends StatelessWidget {
             const SizedBox(height: 16),
             LayoutBuilder(
               builder: (context, constraints) {
-                // Adjust grid based on screen width
                 int crossAxisCount = constraints.maxWidth > 800 ? 4 : 2;
                 return GridView.count(
                   crossAxisCount: crossAxisCount,
@@ -84,17 +145,17 @@ class AdminDashboardScreen extends StatelessWidget {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
-                    _buildBentoCard('Revenue', '\$1.2M', '+12%', const Color(0xFF111111), Colors.white), // Deep Ink card
-                    _buildBentoCard('Properties', '14', '2 new', const Color(0xFFE0E7FF), const Color(0xFF6366F1)), // Indigo
-                    _buildBentoCard('Agents', '32', 'Active', const Color(0xFFFFE0E0), const Color(0xFFFF5E5E)), // Coral
-                    _buildBentoCard('Clients', '412', '+45 this wk', const Color(0xFFFEF08A), const Color(0xFFCA8A04)), // Yellow
+                    _buildBentoCard('Revenue', revenueDisplay, '$soldFractions sold', const Color(0xFF111111), Colors.white), 
+                    _buildBentoCard('Properties', '${propertyProvider.properties.length}', '$totalUnits units total', const Color(0xFFE0E7FF), const Color(0xFF6366F1)), 
+                    _buildBentoCard('Agents', '$agentCount', 'Active', const Color(0xFFFFE0E0), const Color(0xFFFF5E5E)), 
+                    _buildBentoCard('Clients', '$clientCount', 'Network wide', const Color(0xFFFEF08A), const Color(0xFFCA8A04)), 
                   ],
                 );
               },
             ),
             const SizedBox(height: 40),
 
-            // Playful Chart
+            // Live Chart
             Container(
               height: 300,
               padding: const EdgeInsets.all(24),
@@ -111,23 +172,20 @@ class AdminDashboardScreen extends StatelessWidget {
                   Expanded(
                     child: LineChart(
                       LineChartData(
-                        gridData: const FlGridData(show: false), // Hide grid for a cleaner look
+                        gridData: const FlGridData(show: false), 
                         titlesData: const FlTitlesData(
                           rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                           topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)), // Hide left numbers for cleanliness
+                          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)), 
                         ),
                         borderData: FlBorderData(show: false),
                         lineBarsData: [
                           LineChartBarData(
-                            spots: const [
-                              FlSpot(0, 1), FlSpot(1, 2.5), FlSpot(2, 1.8),
-                              FlSpot(3, 4.2), FlSpot(4, 3.1), FlSpot(5, 5.5),
-                            ],
+                            spots: dynamicSpots, // Uses live scaling data
                             isCurved: true,
                             curveSmoothness: 0.4,
                             color: vibrantAccent,
-                            barWidth: 6, // Super thick line
+                            barWidth: 6, 
                             isStrokeCapRound: true,
                             dotData: const FlDotData(show: false),
                             belowBarData: BarAreaData(
@@ -152,31 +210,19 @@ class AdminDashboardScreen extends StatelessWidget {
     );
   }
 
-  // Updated to include context and navigation logic
+  // Quick Action Routing Logic
   Widget _buildQuickAction(BuildContext context, String title, IconData icon, Color bgColor, Color iconColor) {
     return GestureDetector(
       onTap: () {
         if (title == 'Add Asset') {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddPropertyScreen()),
-          );
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const AddPropertyScreen()));
         } else if (title == 'New User') {
-          // Navigates to our brand new screen
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddUserScreen()),
-          );
-        } else {
-          // Placeholder for the other buttons
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('$title Coming Soon!'),
-              behavior: SnackBarBehavior.floating,
-              backgroundColor: textDark,
-            ),
-          );
-        }
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const AddUserScreen()));
+        } else if (title == 'Upload Doc') {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminDocumentsScreen()));
+        } else if (title == 'Payouts') {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminPayoutsScreen()));
+        } 
       },
       child: Column(
         children: [

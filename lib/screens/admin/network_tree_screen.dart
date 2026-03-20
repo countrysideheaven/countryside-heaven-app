@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/app_user.dart';
+import 'client_portfolio_screen.dart'; // <--- Added import
 
 class NetworkTreeScreen extends StatelessWidget {
   const NetworkTreeScreen({Key? key}) : super(key: key);
@@ -33,10 +34,9 @@ class NetworkTreeScreen extends StatelessWidget {
             children: [
               Text('Network Tree 🌳', style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: textDark, letterSpacing: -1)),
               const SizedBox(height: 8),
-              Text('Track agents, partners, and clients. Tap a card to expand.', style: TextStyle(fontSize: 16, color: Colors.grey.shade600)),
+              Text('Track agents, partners, and clients. Tap a card to view their Portfolio.', style: TextStyle(fontSize: 16, color: Colors.grey.shade600)),
               const SizedBox(height: 32),
               
-              // Start building the tree using our new interactive widget
               _NetworkNode(
                 user: rootUser,
                 provider: authProvider,
@@ -50,7 +50,6 @@ class NetworkTreeScreen extends StatelessWidget {
   }
 }
 
-// --- NEW STATEFUL WIDGET FOR COLLAPSIBLE NODES ---
 class _NetworkNode extends StatefulWidget {
   final AppUser user;
   final AuthProvider provider;
@@ -68,7 +67,6 @@ class _NetworkNode extends StatefulWidget {
 }
 
 class _NetworkNodeState extends State<_NetworkNode> {
-  // Start expanded for the root, collapsed for everyone else
   late bool _isExpanded;
 
   @override
@@ -85,23 +83,24 @@ class _NetworkNodeState extends State<_NetworkNode> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 1. The User Card (Now tappable if they have a team)
+        // 1. Tapping the whole card navigates to the Portfolio Screen
         GestureDetector(
-          onTap: hasTeam ? () {
-            setState(() {
-              _isExpanded = !_isExpanded;
-            });
-          } : null, // Only clickable if they have a downline
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => ClientPortfolioScreen(user: widget.user)),
+            );
+          }, 
           child: _buildUserCard(widget.user, downlines.length, isRoot: widget.isRoot, hasTeam: hasTeam),
         ),
         
-        // 2. The Animated Branch and Nested Children
+        // 2. The Animated Branch
         AnimatedSize(
           duration: const Duration(milliseconds: 350),
           curve: Curves.easeInOutCubic,
           alignment: Alignment.topCenter,
           child: (!hasTeam || !_isExpanded)
-              ? const SizedBox(width: double.infinity) // Collapsed state (takes no space)
+              ? const SizedBox(width: double.infinity) 
               : IntrinsicHeight(
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -109,10 +108,7 @@ class _NetworkNodeState extends State<_NetworkNode> {
                       Container(
                         margin: const EdgeInsets.only(left: 28),
                         width: 3,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                        decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(10)),
                       ),
                       const SizedBox(width: 20),
                       Expanded(
@@ -120,7 +116,7 @@ class _NetworkNodeState extends State<_NetworkNode> {
                           children: downlines.map((childUser) {
                             return Padding(
                               padding: const EdgeInsets.only(top: 16.0),
-                              child: _NetworkNode( // Recursively calls itself
+                              child: _NetworkNode(
                                 user: childUser,
                                 provider: widget.provider,
                                 isRoot: false,
@@ -156,10 +152,7 @@ class _NetworkNodeState extends State<_NetworkNode> {
           CircleAvatar(
             radius: 28,
             backgroundColor: isRoot ? Colors.white.withOpacity(0.1) : const Color(0xFFE0E7FF),
-            child: Icon(
-              _getRoleIcon(user.role), 
-              color: isRoot ? Colors.white : const Color(0xFF6366F1),
-            ),
+            child: Icon(_getRoleIcon(user.role), color: isRoot ? Colors.white : const Color(0xFF6366F1)),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -180,32 +173,36 @@ class _NetworkNodeState extends State<_NetworkNode> {
               ],
             ),
           ),
-          // Interactive Downline Pill
+          // Interactive Downline Pill - Tapping this expands/collapses the tree
           if (hasTeam)
-            Container(
-              padding: const EdgeInsets.only(left: 16, right: 12, top: 12, bottom: 12),
-              decoration: BoxDecoration(
-                color: isRoot ? vibrantAccent.withOpacity(0.2) : const Color(0xFFDCFCE7), 
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                children: [
-                  Column(
-                    children: [
-                      Text('$downlineCount', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: isRoot ? vibrantAccent : const Color(0xFF22C55E), height: 1)),
-                      Text('Team', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isRoot ? vibrantAccent : const Color(0xFF22C55E))),
-                    ],
-                  ),
-                  const SizedBox(width: 8),
-                  AnimatedRotation(
-                    turns: _isExpanded ? 0.5 : 0.0, // Rotates the arrow 180 degrees when open
-                    duration: const Duration(milliseconds: 300),
-                    child: Icon(
-                      Icons.keyboard_arrow_down_rounded, 
-                      color: isRoot ? vibrantAccent : const Color(0xFF22C55E),
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _isExpanded = !_isExpanded;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.only(left: 16, right: 12, top: 12, bottom: 12),
+                decoration: BoxDecoration(
+                  color: isRoot ? vibrantAccent.withOpacity(0.2) : const Color(0xFFDCFCE7), 
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    Column(
+                      children: [
+                        Text('$downlineCount', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: isRoot ? vibrantAccent : const Color(0xFF22C55E), height: 1)),
+                        Text('Team', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: isRoot ? vibrantAccent : const Color(0xFF22C55E))),
+                      ],
                     ),
-                  )
-                ],
+                    const SizedBox(width: 8),
+                    AnimatedRotation(
+                      turns: _isExpanded ? 0.5 : 0.0, 
+                      duration: const Duration(milliseconds: 300),
+                      child: Icon(Icons.keyboard_arrow_down_rounded, color: isRoot ? vibrantAccent : const Color(0xFF22C55E)),
+                    )
+                  ],
+                ),
               ),
             )
         ],

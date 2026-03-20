@@ -1,8 +1,11 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/property_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/property_models.dart';
+import '../add_property_screen.dart';
 
 class AdminPropertiesScreen extends StatefulWidget {
   const AdminPropertiesScreen({Key? key}) : super(key: key);
@@ -34,7 +37,10 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
               children: [
                 const Text('Asset Registry 🏢', style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: textDark, letterSpacing: -1)),
                 ElevatedButton.icon(
-                  onPressed: () => _showAddPropertyDialog(context),
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AddPropertyScreen()),
+                  ),
                   icon: const Icon(Icons.add_rounded),
                   label: const Text('New Asset'),
                   style: ElevatedButton.styleFrom(
@@ -70,7 +76,21 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: properties.length,
                 itemBuilder: (context, index) {
-                  return _buildPropertyCard(properties[index], context);
+                  return TweenAnimationBuilder(
+                    tween: Tween<double>(begin: 0, end: 1),
+                    duration: Duration(milliseconds: 400 + (index * 100)), 
+                    curve: Curves.easeOutCubic,
+                    builder: (context, double value, child) {
+                      return Opacity(
+                        opacity: value.clamp(0.0, 1.0),
+                        child: Transform.translate(
+                          offset: Offset(0, 50 * (1 - value)),
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: _buildPropertyCard(properties[index], context),
+                  );
                 },
               ),
           ],
@@ -82,58 +102,99 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
   Widget _buildPropertyCard(Property property, BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 20, offset: const Offset(0, 8))],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 10))],
       ),
-      child: ExpansionTile(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(child: Text(property.name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: textDark))),
-            // Property Options Menu
-            PopupMenuButton<String>(
-              icon: const Icon(Icons.more_horiz_rounded, color: textDark),
-              onSelected: (value) {
-                if (value == 'edit') {
-                  _showEditPropertyDialog(context, property);
-                } else if (value == 'delete') {
-                  _showConfirmDeleteDialog(
-                    context: context, 
-                    title: 'Delete Property', 
-                    content: 'Are you sure? This will delete all units and fractions inside ${property.name}.',
-                    onConfirm: () => Provider.of<PropertyProvider>(context, listen: false).deleteProperty(property.id),
-                  );
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_rounded, size: 18), SizedBox(width: 8), Text('Edit Details')])),
-                const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_forever_rounded, size: 18, color: Colors.red), SizedBox(width: 8), Text('Delete Property', style: TextStyle(color: Colors.red))])),
-              ],
-            )
-          ],
-        ),
-        subtitle: Text('${property.location} • ${property.units.length} Units', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
-        childrenPadding: const EdgeInsets.all(24),
+      child: Column(
         children: [
-          ...property.units.map((unit) => _buildUnitSection(property, unit, context)).toList(),
-          SizedBox(
+          // GORGEOUS IMAGE BANNER WITH FALLBACK
+          Container(
+            height: 180,
             width: double.infinity,
-            height: 56,
-            child: OutlinedButton.icon(
-              onPressed: () => _showAddUnitDialog(context, property.id),
-              icon: const Icon(Icons.add_home_work_rounded),
-              label: const Text('Add Custom Unit', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: textDark,
-                side: BorderSide(color: Colors.grey.shade300, width: 2),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade200,
+              image: DecorationImage(
+                image: property.imageUrls.isNotEmpty
+                    ? (kIsWeb 
+                        ? NetworkImage(property.imageUrls.first) 
+                        : FileImage(File(property.imageUrls.first)) as ImageProvider)
+                    // If no image is provided, show this gorgeous real estate placeholder
+                    : const NetworkImage('https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=2075&auto=format&fit=crop'), 
+                fit: BoxFit.cover,
               ),
             ),
-          )
+          ),
+
+          // THE CARD CONTENT
+          Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              childrenPadding: const EdgeInsets.only(left: 24, right: 24, bottom: 24),
+              title: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(child: Text(property.name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: textDark))),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_horiz_rounded, color: textDark),
+                    onSelected: (value) {
+                      if (value == 'edit') {
+                        _showEditPropertyDialog(context, property);
+                      } else if (value == 'delete') {
+                        _showConfirmDeleteDialog(
+                          context: context, 
+                          title: 'Delete Property', 
+                          content: 'Are you sure? This will delete all units and fractions inside ${property.name}.',
+                          onConfirm: () => Provider.of<PropertyProvider>(context, listen: false).deleteProperty(property.id),
+                        );
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_rounded, size: 18), SizedBox(width: 8), Text('Edit Details')])),
+                      const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_forever_rounded, size: 18, color: Colors.red), SizedBox(width: 8), Text('Delete Property', style: TextStyle(color: Colors.red))])),
+                    ],
+                  )
+                ],
+              ),
+              subtitle: Text('${property.location} • ${property.units.length} Units', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+              children: [
+                if (property.description.isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(color: const Color(0xFFF7F7F9), borderRadius: BorderRadius.circular(16)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('About this Asset', style: TextStyle(fontWeight: FontWeight.w800, color: textDark, fontSize: 14)),
+                        const SizedBox(height: 8),
+                        Text(property.description, style: TextStyle(color: Colors.grey.shade700, height: 1.5)),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+                ...property.units.map((unit) => _buildUnitSection(property, unit, context)).toList(),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showAddUnitDialog(context, property.id),
+                    icon: const Icon(Icons.add_home_work_rounded),
+                    label: const Text('Add Custom Unit', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: textDark,
+                      side: BorderSide(color: Colors.grey.shade300, width: 2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                  ),
+                )
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -164,7 +225,6 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
                   ],
                 ),
               ),
-              // Unit Options Menu
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert_rounded, color: Colors.grey),
                 onSelected: (value) {
@@ -188,7 +248,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
           ),
           const SizedBox(height: 16),
           
-          const Text('11 Fractions', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+          Text('${unit.fractions.length} Fractions', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -231,63 +291,10 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
 
   // --- DIALOGS ---
 
-  void _showAddPropertyDialog(BuildContext context) {
-    final nameCtrl = TextEditingController();
-    final locCtrl = TextEditingController();
-    final unitsCtrl = TextEditingController(text: '1');
-    final priceCtrl = TextEditingController(text: '5000');
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Add New Property', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textDark)),
-            const SizedBox(height: 24),
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Property Name', border: OutlineInputBorder())),
-            const SizedBox(height: 16),
-            TextField(controller: locCtrl, decoration: const InputDecoration(labelText: 'Location', border: OutlineInputBorder())),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(child: TextField(controller: unitsCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Initial Units', border: OutlineInputBorder()))),
-                const SizedBox(width: 16),
-                Expanded(child: TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Fraction Price (\$)', border: OutlineInputBorder()))),
-              ],
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: textDark, foregroundColor: Colors.white),
-                onPressed: () {
-                  if (nameCtrl.text.isNotEmpty) {
-                    Provider.of<PropertyProvider>(context, listen: false).addProperty(
-                      nameCtrl.text, locCtrl.text, int.tryParse(unitsCtrl.text) ?? 1, double.tryParse(priceCtrl.text) ?? 0,
-                    );
-                    Navigator.pop(context);
-                  }
-                },
-                child: const Text('Create Property & Generate Fractions', style: TextStyle(fontWeight: FontWeight.bold)),
-              ),
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showEditPropertyDialog(BuildContext context, Property property) {
     final nameCtrl = TextEditingController(text: property.name);
     final locCtrl = TextEditingController(text: property.location);
+    final descCtrl = TextEditingController(text: property.description);
 
     showDialog(
       context: context,
@@ -298,6 +305,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
           children: [
             TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name')),
             TextField(controller: locCtrl, decoration: const InputDecoration(labelText: 'Location')),
+            TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description'), maxLines: 3),
           ],
         ),
         actions: [
@@ -305,6 +313,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
           ElevatedButton(
             onPressed: () {
               Provider.of<PropertyProvider>(context, listen: false).updateProperty(property.id, nameCtrl.text, locCtrl.text);
+              property.description = descCtrl.text; 
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(backgroundColor: textDark, foregroundColor: Colors.white),
@@ -408,7 +417,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
   }
 
   void _showAssignFractionDialog(BuildContext context, String propId, String unitId, String fractionId) {
-    final users = Provider.of<AuthProvider>(context, listen: false).getDownline('ADMIN123'); // Getting direct admin users for test
+    final users = Provider.of<AuthProvider>(context, listen: false).getDownline('ADMIN123'); 
 
     showModalBottomSheet(
       context: context,

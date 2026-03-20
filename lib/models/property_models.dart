@@ -9,12 +9,16 @@ class Unit {
   final String id;
   String name; 
   double fractionPrice;
+  String description; 
+  List<String> imageUrls; 
   final List<Fraction> fractions;
 
   Unit({
     required this.id,
     required this.name,
     required this.fractionPrice,
+    this.description = '',
+    this.imageUrls = const [],
     required this.fractions,
   });
 
@@ -25,12 +29,16 @@ class Property {
   final String id;
   String name; 
   String location; 
+  String description; 
+  List<String> imageUrls; 
   final List<Unit> units;
 
   Property({
     required this.id,
     required this.name,
     required this.location,
+    this.description = '',
+    this.imageUrls = const [],
     required this.units,
   });
 }
@@ -39,7 +47,7 @@ class UserDocument {
   final String id;
   final String userId;
   final String fileName;
-  final String? fileUrl; // Stores the R2 public link
+  final String? fileUrl; 
   String status; 
 
   UserDocument({
@@ -53,7 +61,6 @@ class UserDocument {
 
 class Booking {
   final String id;
-  // We store BOTH the unique ID (for logic) and the Name (for the UI)
   final String unitId;
   final String? unitName; 
   final String fractionId;
