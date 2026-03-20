@@ -11,24 +11,31 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
+  final _passwordController = TextEditingController(); // Added for password support
   bool _isLoading = false;
 
-  final Color bgDark = const Color(0xFF111111); // Deep Ink
+  final Color bgDark = const Color(0xFF111111);
   final Color bgLight = const Color(0xFFF7F7F9);
-  final Color vibrantAccent = const Color(0xFFFF5E5E); // Electric Coral
+  final Color vibrantAccent = const Color(0xFFFF5E5E);
 
   @override
   void dispose() {
     _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleLogin(String email) async {
+  // Updated to handle both email and password
+  Future<void> _handleLogin(String email, String password) async {
+    if (email.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter both email and password')));
+      return;
+    }
+
     setState(() => _isLoading = true);
     
     try {
-      await Provider.of<AuthProvider>(context, listen: false).login(email);
-      // Main.dart handles the routing automatically!
+      await Provider.of<AuthProvider>(context, listen: false).login(email, password);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -53,7 +60,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: TweenAnimationBuilder(
               tween: Tween<double>(begin: 0, end: 1),
               duration: const Duration(milliseconds: 800),
-              curve: Curves.elasticOut, // Super bouncy entrance
+              curve: Curves.elasticOut,
               builder: (context, double value, child) {
                 return Transform.scale(
                   scale: 0.8 + (0.2 * value),
@@ -71,7 +78,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Logo Area
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(color: vibrantAccent.withOpacity(0.1), shape: BoxShape.circle),
@@ -82,7 +88,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     Text('Fractional Real Estate, Fast.', style: TextStyle(fontSize: 14, color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 40),
 
-                    // Inputs
                     TextFormField(
                       controller: _emailController,
                       style: const TextStyle(fontWeight: FontWeight.w600),
@@ -96,6 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
+                      controller: _passwordController,
                       obscureText: true,
                       style: const TextStyle(fontWeight: FontWeight.w600),
                       decoration: InputDecoration(
@@ -108,12 +114,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 32),
 
-                    // Login Button
                     SizedBox(
                       width: double.infinity,
                       height: 60,
                       child: ElevatedButton(
-                        onPressed: _isLoading ? null : () => _handleLogin(_emailController.text.trim()),
+                        onPressed: _isLoading ? null : () => _handleLogin(_emailController.text.trim(), _passwordController.text.trim()),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: bgDark,
                           foregroundColor: Colors.white,
@@ -128,19 +133,21 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 32),
                     
-                    // --- DEV TOOLS (For Vibe Coding) ---
                     const Divider(),
                     const SizedBox(height: 16),
                     Text('Quick Dev Login', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade400)),
                     const SizedBox(height: 16),
+                    
+                    // Unified Dev Buttons for all roles
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
                       alignment: WrapAlignment.center,
                       children: [
-                        _buildDevButton('Admin', 'admin@countryside.com', vibrantAccent),
-                        _buildDevButton('Partner', 'alex@partner.com', const Color(0xFF6366F1)),
-                        _buildDevButton('Sales', 'sarah@sales.com', const Color(0xFFCA8A04)),
+                        _buildDevButton('Admin', 'admin@test.com', vibrantAccent),
+                        _buildDevButton('Partner', 'partner@test.com', const Color(0xFF8B5CF6)),
+                        _buildDevButton('Sales', 'sales@test.com', const Color(0xFFCA8A04)),
+                        _buildDevButton('Customer', 'customer@test.com', const Color(0xFF22C55E)),
                       ],
                     )
                   ],
@@ -157,7 +164,8 @@ class _LoginScreenState extends State<LoginScreen> {
     return InkWell(
       onTap: () {
         _emailController.text = email;
-        _handleLogin(email);
+        _passwordController.text = 'password@123'; // Standard test password
+        _handleLogin(email, 'password@123');
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
