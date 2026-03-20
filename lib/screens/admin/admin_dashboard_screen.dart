@@ -11,6 +11,8 @@ import 'add_user_screen.dart';
 import 'admin_documents_screen.dart';
 import 'admin_payouts_screen.dart';
 
+import '../shared/marketing_hub_screen.dart'; // Add this line
+
 class AdminDashboardScreen extends StatelessWidget {
   const AdminDashboardScreen({Key? key}) : super(key: key);
 
@@ -126,6 +128,9 @@ class AdminDashboardScreen extends StatelessWidget {
                   _buildQuickAction(context, 'Upload Doc', Icons.cloud_upload_rounded, const Color(0xFFDCFCE7), const Color(0xFF22C55E)),
                   const SizedBox(width: 16),
                   _buildQuickAction(context, 'Payouts', Icons.payments_rounded, const Color(0xFFFEF08A), const Color(0xFFCA8A04)),
+                  // Add this right after the 'Payouts' button:
+const SizedBox(width: 16),
+_buildQuickAction(context, 'Marketing', Icons.campaign_rounded, const Color(0xFFF3E8FF), const Color(0xFF8B5CF6)),
                 ],
               ),
             ),
@@ -223,6 +228,9 @@ class AdminDashboardScreen extends StatelessWidget {
         } else if (title == 'Payouts') {
           Navigator.push(context, MaterialPageRoute(builder: (context) => const AdminPayoutsScreen()));
         } 
+        else if (title == 'Marketing') { // <--- ADD THIS BLOCK
+  Navigator.push(context, MaterialPageRoute(builder: (context) => const MarketingHubScreen()));
+}
       },
       child: Column(
         children: [

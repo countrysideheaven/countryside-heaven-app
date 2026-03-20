@@ -1,4 +1,4 @@
-enum UserRole { admin, salesAgent, channelPartner, customer }
+enum UserRole { admin, customer, salesAgent, channelPartner }
 
 class AppUser {
   final String id;
@@ -6,8 +6,13 @@ class AppUser {
   final String email;
   final UserRole role;
   final String myReferralCode;
-  final String? referredByCode; // The code they used to sign up
-  final String? assignedToId; // If customer is assigned to a specific partner/agent
+  final String? referredByCode;
+  final DateTime createdAt;
+  
+  // Co-Branding Fields (Optional so they don't break existing user creation)
+  String? companyName;
+  String? phoneNumber;
+  String? logoUrl;
 
   AppUser({
     required this.id,
@@ -16,24 +21,41 @@ class AppUser {
     required this.role,
     required this.myReferralCode,
     this.referredByCode,
-    this.assignedToId,
+    required this.createdAt,
+    this.companyName,
+    this.phoneNumber,
+    this.logoUrl,
   });
 
-  // Automatically defaults to admin code if none provided
-  factory AppUser.createNew({
-    required String id,
-    required String name,
-    required String email,
-    required UserRole role,
-    String? enteredReferralCode,
-  }) {
+  factory AppUser.fromJson(Map<String, dynamic> json) {
     return AppUser(
-      id: id,
-      name: name,
-      email: email,
-      role: role,
-      myReferralCode: '${name.substring(0, 3).toUpperCase()}${DateTime.now().millisecondsSinceEpoch.toString().substring(9)}',
-      referredByCode: enteredReferralCode?.isEmpty ?? true ? 'ADMIN_DEFAULT' : enteredReferralCode,
+      id: json['id'],
+      name: json['name'],
+      email: json['email'],
+      // Fallback to customer if role parsing fails
+      role: UserRole.values.firstWhere((e) => e.name == json['role'], orElse: () => UserRole.customer),
+      myReferralCode: json['my_referral_code'],
+      referredByCode: json['referred_by_code'],
+      createdAt: DateTime.parse(json['created_at']),
+      // New branding fields parsed safely
+      companyName: json['company_name'],
+      phoneNumber: json['phone_number'],
+      logoUrl: json['logo_url'],
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+      'role': role.name,
+      'my_referral_code': myReferralCode,
+      'referred_by_code': referredByCode,
+      'created_at': createdAt.toIso8601String(),
+      'company_name': companyName,
+      'phone_number': phoneNumber,
+      'logo_url': logoUrl,
+    };
   }
 }
