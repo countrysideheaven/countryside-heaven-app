@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
-import 'dart:html' as html; 
+
+// Robust Conditional Import
+import 'dart:html' if (dart.library.io) 'package:countryside_heaven_app/screens/shared/mock_html.dart' as html;
 
 import '../../providers/auth_provider.dart';
 import '../../models/app_user.dart';
@@ -18,9 +20,6 @@ class MarketingAsset {
   MarketingAsset({required this.id, required this.title, required this.url, required this.isVideo});
 }
 
-// ==========================================
-// 1. THE CLEAN GRID SCREEN
-// ==========================================
 class MarketingHubScreen extends StatefulWidget {
   const MarketingHubScreen({Key? key}) : super(key: key);
 
@@ -37,7 +36,6 @@ class _MarketingHubScreenState extends State<MarketingHubScreen> {
     MarketingAsset(
       id: '1', 
       title: 'Luxury Villa Campaign', 
-      // Replace this URL with a valid R2 bucket image link to prevent CORS issues on Web.
       url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=1000&auto=format&fit=crop', 
       isVideo: false
     ),
@@ -159,9 +157,6 @@ class _MarketingHubScreenState extends State<MarketingHubScreen> {
   }
 }
 
-// ==========================================
-// 2. THE DETAILS & STAMPING SCREEN
-// ==========================================
 class MarketingAssetDetailsScreen extends StatefulWidget {
   final MarketingAsset asset;
   final AppUser user;
@@ -180,7 +175,6 @@ class _MarketingAssetDetailsScreenState extends State<MarketingAssetDetailsScree
   bool _isProcessing = false;
 
   bool _isProfileComplete() {
-    // This now strictly checks if the user has saved their branding details!
     return widget.user.companyName != null && widget.user.companyName!.isNotEmpty &&
            widget.user.phoneNumber != null && widget.user.phoneNumber!.isNotEmpty;
   }
@@ -205,8 +199,8 @@ class _MarketingAssetDetailsScreenState extends State<MarketingAssetDetailsScree
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Go back to hub
+              Navigator.pop(context);
+              Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(backgroundColor: textDark, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             child: const Text('Go to Profile', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
@@ -249,7 +243,6 @@ class _MarketingAssetDetailsScreenState extends State<MarketingAssetDetailsScree
       final Rect bannerRect = Rect.fromLTWH(0, originalImage.height.toDouble(), width.toDouble(), bannerHeight.toDouble());
       canvas.drawRect(bannerRect, Paint()..color = const Color(0xFFFFFFFF));
 
-      // Uses actual saved user profile data here
       final String companyName = widget.user.companyName!; 
       final String contactInfo = "Call: ${widget.user.phoneNumber!} | Email: ${widget.user.email}";
 
@@ -263,33 +256,6 @@ class _MarketingAssetDetailsScreenState extends State<MarketingAssetDetailsScree
       
       textPainter.layout(maxWidth: width.toDouble() * 0.65); 
       textPainter.paint(canvas, Offset(bannerHeight * 0.25, originalImage.height.toDouble() + (bannerHeight - textPainter.height) / 2));
-
-      // Logo rendering logic (Add back if you complete R2 logo uploads)
-      try {
-        final logoResponse = await http.get(Uri.parse('https://upload.wikimedia.org/wikipedia/commons/a/a7/React-icon.svg.png'));
-        final ui.Codec logoCodec = await ui.instantiateImageCodec(logoResponse.bodyBytes);
-        final ui.FrameInfo logoFrame = await logoCodec.getNextFrame();
-        final ui.Image logoImage = logoFrame.image;
-
-        final double aspect = logoImage.width / logoImage.height;
-        double targetHeight = bannerHeight * 0.6; 
-        double targetWidth = targetHeight * aspect;
-        
-        if (targetWidth > width * 0.25) {
-           targetWidth = width * 0.25;
-           targetHeight = targetWidth / aspect;
-        }
-        
-        final double dx = width - targetWidth - (bannerHeight * 0.25);
-        final double dy = originalImage.height + (bannerHeight - targetHeight) / 2;
-        
-        final Rect srcRect = Rect.fromLTWH(0, 0, logoImage.width.toDouble(), logoImage.height.toDouble());
-        final Rect dstRect = Rect.fromLTWH(dx, dy, targetWidth, targetHeight);
-        
-        canvas.drawImageRect(logoImage, srcRect, dstRect, Paint());
-      } catch (logoError) {
-         debugPrint("Could not load logo: $logoError");
-      }
 
       final ui.Image stampedImage = await recorder.endRecording().toImage(width, totalHeight);
       final ByteData? byteData = await stampedImage.toByteData(format: ui.ImageByteFormat.png);
@@ -306,9 +272,11 @@ class _MarketingAssetDetailsScreenState extends State<MarketingAssetDetailsScree
 
   void _downloadToBrowser(String url, String filename) {
     if (kIsWeb) {
-      html.AnchorElement anchorElement = html.AnchorElement(href: url);
-      anchorElement.download = filename;
-      anchorElement.click();
+      final anchor = html.AnchorElement(href: url);
+      anchor.download = filename;
+      anchor.click();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download currently supported on Web only.')));
     }
   }
 
@@ -316,10 +284,12 @@ class _MarketingAssetDetailsScreenState extends State<MarketingAssetDetailsScree
     if (kIsWeb) {
       final blob = html.Blob([bytes]);
       final url = html.Url.createObjectUrlFromBlob(blob);
-      final anchor = html.AnchorElement(href: url)
-        ..setAttribute("download", filename)
-        ..click();
+      final anchor = html.AnchorElement(href: url);
+      anchor.setAttribute("download", filename);
+      anchor.click();
       html.Url.revokeObjectUrl(url);
+    } else {
+       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Personalization currently supported on Web only.')));
     }
   }
 
