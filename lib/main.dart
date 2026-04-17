@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; // <--- NEW IMPORT
 
 import 'providers/auth_provider.dart';
 import 'providers/property_provider.dart';
@@ -13,19 +12,15 @@ import 'screens/customer_main_screen.dart';
 import 'screens/sales_main_screen.dart';
 
 Future<void> main() async {
-  // Required to ensure Flutter bindings are initialized before async operations
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Load the .env file
-  await dotenv.load(fileName: ".env");
+  // 1. Grab keys securely from the compile-time environment
+  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  const supabaseKey = String.fromEnvironment('SUPABASE_ANON_KEY');
 
-  // 2. Safely grab the keys
-  final supabaseUrl = dotenv.env['SUPABASE_URL'];
-  final supabaseKey = dotenv.env['SUPABASE_ANON_KEY'];
-
-  // Safety check to ensure the .env file is set up correctly
-  if (supabaseUrl == null || supabaseKey == null) {
-    throw Exception('Missing SUPABASE_URL or SUPABASE_ANON_KEY in .env file');
+  // 2. Proper safety check for compile-time strings
+  if (supabaseUrl.isEmpty || supabaseKey.isEmpty) {
+    throw Exception('Missing variables. You must run the app with --dart-define-from-file=env.json');
   }
 
   // 3. Initialize Supabase
