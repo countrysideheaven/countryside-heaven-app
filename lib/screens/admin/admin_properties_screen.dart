@@ -35,7 +35,16 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Asset Registry 🏢', style: TextStyle(fontSize: 36, fontWeight: FontWeight.w900, color: textDark, letterSpacing: -1)),
+                // Wrap the text in Expanded so it flexes to fit the screen
+                const Expanded(
+                  child: Text(
+                    'Asset Registry 🏢', 
+                    style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: textDark, letterSpacing: -1),
+                    maxLines: 1, // Keeps it on one line
+                    overflow: TextOverflow.ellipsis, // Adds ... if the screen is super tiny
+                  ),
+                ),
+                const SizedBox(width: 16), // Add a little breathing room
                 ElevatedButton.icon(
                   onPressed: () => Navigator.push(
                     context,
@@ -53,20 +62,40 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            Text('Full control over properties, units, and fractional ownership.', style: TextStyle(fontSize: 16, color: Colors.grey.shade600)),
+            Text(
+              'Full control over properties, units, and fractional ownership.',
+              style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
+            ),
             const SizedBox(height: 32),
 
             if (properties.isEmpty)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(40),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                ),
                 child: Column(
                   children: [
-                    Icon(Icons.landscape_rounded, size: 64, color: Colors.grey.shade300),
+                    Icon(
+                      Icons.landscape_rounded,
+                      size: 64,
+                      color: Colors.grey.shade300,
+                    ),
                     const SizedBox(height: 16),
-                    const Text('No Assets Found', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: textDark)),
-                    Text('Click "New Asset" to build your portfolio.', style: TextStyle(color: Colors.grey.shade500)),
+                    const Text(
+                      'No Assets Found',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: textDark,
+                      ),
+                    ),
+                    Text(
+                      'Click "New Asset" to build your portfolio.',
+                      style: TextStyle(color: Colors.grey.shade500),
+                    ),
                   ],
                 ),
               )
@@ -78,7 +107,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
                 itemBuilder: (context, index) {
                   return TweenAnimationBuilder(
                     tween: Tween<double>(begin: 0, end: 1),
-                    duration: Duration(milliseconds: 400 + (index * 100)), 
+                    duration: Duration(milliseconds: 400 + (index * 100)),
                     curve: Curves.easeOutCubic,
                     builder: (context, double value, child) {
                       return Opacity(
@@ -106,7 +135,13 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 20, offset: const Offset(0, 10))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -118,11 +153,17 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
               color: Colors.grey.shade200,
               image: DecorationImage(
                 image: property.imageUrls.isNotEmpty
-                    ? (kIsWeb 
-                        ? NetworkImage(property.imageUrls.first) 
-                        : FileImage(File(property.imageUrls.first)) as ImageProvider)
+                    ? (property.imageUrls.first.startsWith('http')
+                          ? NetworkImage(property.imageUrls.first)
+                                as ImageProvider
+                          : (kIsWeb
+                                ? NetworkImage(property.imageUrls.first)
+                                : FileImage(File(property.imageUrls.first))
+                                      as ImageProvider))
                     // If no image is provided, show this gorgeous real estate placeholder
-                    : const NetworkImage('https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=2075&auto=format&fit=crop'), 
+                    : const NetworkImage(
+                        'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=2075&auto=format&fit=crop',
+                      ),
                 fit: BoxFit.cover,
               ),
             ),
@@ -132,12 +173,28 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
           Theme(
             data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
             child: ExpansionTile(
-              tilePadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              childrenPadding: const EdgeInsets.only(left: 24, right: 24, bottom: 24),
+              tilePadding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 8,
+              ),
+              childrenPadding: const EdgeInsets.only(
+                left: 24,
+                right: 24,
+                bottom: 24,
+              ),
               title: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Expanded(child: Text(property.name, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: textDark))),
+                  Expanded(
+                    child: Text(
+                      property.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 20,
+                        color: textDark,
+                      ),
+                    ),
+                  ),
                   PopupMenuButton<String>(
                     icon: const Icon(Icons.more_horiz_rounded, color: textDark),
                     onSelected: (value) {
@@ -145,53 +202,114 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
                         _showEditPropertyDialog(context, property);
                       } else if (value == 'delete') {
                         _showConfirmDeleteDialog(
-                          context: context, 
-                          title: 'Delete Property', 
-                          content: 'Are you sure? This will delete all units and fractions inside ${property.name}.',
-                          onConfirm: () => Provider.of<PropertyProvider>(context, listen: false).deleteProperty(property.id),
+                          context: context,
+                          title: 'Delete Property',
+                          content:
+                              'Are you sure? This will delete all units and fractions inside ${property.name}.',
+                          onConfirm: () => Provider.of<PropertyProvider>(
+                            context,
+                            listen: false,
+                          ).deleteProperty(property.id),
                         );
                       }
                     },
                     itemBuilder: (context) => [
-                      const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_rounded, size: 18), SizedBox(width: 8), Text('Edit Details')])),
-                      const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_forever_rounded, size: 18, color: Colors.red), SizedBox(width: 8), Text('Delete Property', style: TextStyle(color: Colors.red))])),
+                      const PopupMenuItem(
+                        value: 'edit',
+                        child: Row(
+                          children: [
+                            Icon(Icons.edit_rounded, size: 18),
+                            SizedBox(width: 8),
+                            Text('Edit Details'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.delete_forever_rounded,
+                              size: 18,
+                              color: Colors.red,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              'Delete Property',
+                              style: TextStyle(color: Colors.red),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
-                  )
+                  ),
                 ],
               ),
-              subtitle: Text('${property.location} • ${property.units.length} Units', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+              subtitle: Text(
+                '${property.location} • ${property.units.length} Units',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
               children: [
                 if (property.description.isNotEmpty) ...[
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(color: const Color(0xFFF7F7F9), borderRadius: BorderRadius.circular(16)),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF7F7F9),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('About this Asset', style: TextStyle(fontWeight: FontWeight.w800, color: textDark, fontSize: 14)),
+                        const Text(
+                          'About this Asset',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: textDark,
+                            fontSize: 14,
+                          ),
+                        ),
                         const SizedBox(height: 8),
-                        Text(property.description, style: TextStyle(color: Colors.grey.shade700, height: 1.5)),
+                        Text(
+                          property.description,
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            height: 1.5,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 24),
                 ],
-                ...property.units.map((unit) => _buildUnitSection(property, unit, context)).toList(),
+                ...property.units
+                    .map((unit) => _buildUnitSection(property, unit, context))
+                    .toList(),
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: OutlinedButton.icon(
                     onPressed: () => _showAddUnitDialog(context, property.id),
                     icon: const Icon(Icons.add_home_work_rounded),
-                    label: const Text('Add Custom Unit', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    label: const Text(
+                      'Add Custom Unit',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: textDark,
                       side: BorderSide(color: Colors.grey.shade300, width: 2),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
                     ),
                   ),
-                )
+                ),
               ],
             ),
           ),
@@ -219,9 +337,23 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(unit.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: textDark)),
+                    Text(
+                      unit.name,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: textDark,
+                      ),
+                    ),
                     const SizedBox(height: 4),
-                    Text('\$${unit.fractionPrice.toStringAsFixed(0)} / fraction', style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold, fontSize: 14)),
+                    Text(
+                      '\₹${unit.fractionPrice.toStringAsFixed(0)} / fraction',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -232,23 +364,58 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
                     _showEditUnitDialog(context, property.id, unit);
                   } else if (value == 'delete') {
                     _showConfirmDeleteDialog(
-                      context: context, 
-                      title: 'Delete Unit', 
+                      context: context,
+                      title: 'Delete Unit',
                       content: 'Are you sure you want to delete ${unit.name}?',
-                      onConfirm: () => Provider.of<PropertyProvider>(context, listen: false).deleteUnit(property.id, unit.id),
+                      onConfirm: () => Provider.of<PropertyProvider>(
+                        context,
+                        listen: false,
+                      ).deleteUnit(property.id, unit.id),
                     );
                   }
                 },
                 itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_rounded, size: 18), SizedBox(width: 8), Text('Edit Unit')])),
-                  const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_forever_rounded, size: 18, color: Colors.red), SizedBox(width: 8), Text('Delete Unit', style: TextStyle(color: Colors.red))])),
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_rounded, size: 18),
+                        SizedBox(width: 8),
+                        Text('Edit Unit'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.delete_forever_rounded,
+                          size: 18,
+                          color: Colors.red,
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Delete Unit',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
-              )
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          
-          Text('${unit.fractions.length} Fractions', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+
+          Text(
+            '${unit.fractions.length} Fractions',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Colors.grey,
+            ),
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -261,9 +428,19 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
               return GestureDetector(
                 onTap: () {
                   if (!isAssigned) {
-                    _showAssignFractionDialog(context, property.id, unit.id, fraction.id);
+                    _showAssignFractionDialog(
+                      context,
+                      property.id,
+                      unit.id,
+                      fraction.id,
+                    );
                   } else {
-                    _showManageAssignedFractionDialog(context, property.id, unit.id, fraction);
+                    _showManageAssignedFractionDialog(
+                      context,
+                      property.id,
+                      unit.id,
+                      fraction,
+                    );
                   }
                 },
                 child: AnimatedContainer(
@@ -273,17 +450,34 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
                   decoration: BoxDecoration(
                     color: isAssigned ? assignedColor : availableColor,
                     borderRadius: BorderRadius.circular(12),
-                    boxShadow: [if (!isAssigned) BoxShadow(color: availableColor.withOpacity(0.5), blurRadius: 4, offset: const Offset(0, 2))],
+                    boxShadow: [
+                      if (!isAssigned)
+                        BoxShadow(
+                          color: availableColor.withOpacity(0.5),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                    ],
                   ),
                   child: Center(
-                    child: isAssigned 
-                        ? const Icon(Icons.check_rounded, color: Colors.white, size: 20)
-                        : Text('${index + 1}', style: const TextStyle(color: Color(0xFF6366F1), fontWeight: FontWeight.w900)),
+                    child: isAssigned
+                        ? const Icon(
+                            Icons.check_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          )
+                        : Text(
+                            '${index + 1}',
+                            style: const TextStyle(
+                              color: Color(0xFF6366F1),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
                   ),
                 ),
               );
             }).toList(),
-          )
+          ),
         ],
       ),
     );
@@ -303,22 +497,41 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Name')),
-            TextField(controller: locCtrl, decoration: const InputDecoration(labelText: 'Location')),
-            TextField(controller: descCtrl, decoration: const InputDecoration(labelText: 'Description'), maxLines: 3),
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+            TextField(
+              controller: locCtrl,
+              decoration: const InputDecoration(labelText: 'Location'),
+            ),
+            TextField(
+              controller: descCtrl,
+              decoration: const InputDecoration(labelText: 'Description'),
+              maxLines: 3,
+            ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () {
-              Provider.of<PropertyProvider>(context, listen: false).updateProperty(property.id, nameCtrl.text, locCtrl.text);
-              property.description = descCtrl.text; 
+              Provider.of<PropertyProvider>(
+                context,
+                listen: false,
+              ).updateProperty(property.id, nameCtrl.text, locCtrl.text);
+              property.description = descCtrl.text;
               Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: textDark, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: textDark,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Save'),
-          )
+          ),
         ],
       ),
     );
@@ -332,31 +545,76 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+      ),
       builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 24, right: 24, top: 24),
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: 24,
+          right: 24,
+          top: 24,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Add Custom Unit', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textDark)),
+            const Text(
+              'Add Custom Unit',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                color: textDark,
+              ),
+            ),
             const SizedBox(height: 24),
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Unit Name (e.g. Penthouse A)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.meeting_room_rounded))),
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Unit Name (e.g. Penthouse A)',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.meeting_room_rounded),
+              ),
+            ),
             const SizedBox(height: 16),
-            TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Fraction Price (\$)', border: OutlineInputBorder(), prefixIcon: Icon(Icons.attach_money_rounded))),
+            TextField(
+              controller: priceCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Fraction Price (\₹)',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.attach_money_rounded),
+              ),
+            ),
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,
               height: 56,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: textDark, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: textDark,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
                 onPressed: () {
                   if (nameCtrl.text.isNotEmpty && priceCtrl.text.isNotEmpty) {
-                    Provider.of<PropertyProvider>(context, listen: false).addUnitToProperty(propId, nameCtrl.text, double.tryParse(priceCtrl.text) ?? 0);
+                    Provider.of<PropertyProvider>(
+                      context,
+                      listen: false,
+                    ).addUnitToProperty(
+                      propId,
+                      nameCtrl.text,
+                      double.tryParse(priceCtrl.text) ?? 0,
+                    );
                     Navigator.pop(context);
                   }
                 },
-                child: const Text('Add Unit & Generate 11 Fractions', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                child: const Text(
+                  'Add Unit & Generate 11 Fractions',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -368,7 +626,9 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
 
   void _showEditUnitDialog(BuildContext context, String propId, Unit unit) {
     final nameCtrl = TextEditingController(text: unit.name);
-    final priceCtrl = TextEditingController(text: unit.fractionPrice.toStringAsFixed(0));
+    final priceCtrl = TextEditingController(
+      text: unit.fractionPrice.toStringAsFixed(0),
+    );
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -376,48 +636,97 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Unit Name')),
-            TextField(controller: priceCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Fraction Price (\$)', prefixText: '\$')),
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(labelText: 'Unit Name'),
+            ),
+            TextField(
+              controller: priceCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Fraction Price (\₹)',
+                prefixText: '\₹',
+              ),
+            ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () {
-              Provider.of<PropertyProvider>(context, listen: false).updateUnitDetails(propId, unit.id, nameCtrl.text, double.parse(priceCtrl.text));
+              Provider.of<PropertyProvider>(
+                context,
+                listen: false,
+              ).updateUnitDetails(
+                propId,
+                unit.id,
+                nameCtrl.text,
+                double.parse(priceCtrl.text),
+              );
               Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: textDark, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: textDark,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Save'),
-          )
+          ),
         ],
       ),
     );
   }
 
-  void _showConfirmDeleteDialog({required BuildContext context, required String title, required String content, required VoidCallback onConfirm}) {
+  void _showConfirmDeleteDialog({
+    required BuildContext context,
+    required String title,
+    required String content,
+    required VoidCallback onConfirm,
+  }) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(title, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.red,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         content: Text(content),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel', style: TextStyle(color: Colors.black))),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.black)),
+          ),
           ElevatedButton(
             onPressed: () {
               onConfirm();
               Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Delete'),
-          )
+          ),
         ],
       ),
     );
   }
 
-  void _showAssignFractionDialog(BuildContext context, String propId, String unitId, String fractionId) {
-    final users = Provider.of<AuthProvider>(context, listen: false).getDownline('ADMIN123'); 
+  void _showAssignFractionDialog(
+    BuildContext context,
+    String propId,
+    String unitId,
+    String fractionId,
+  ) {
+    final users = Provider.of<AuthProvider>(
+      context,
+      listen: false,
+    ).getDownline('ADMIN123');
 
     showModalBottomSheet(
       context: context,
@@ -427,51 +736,89 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Assign Fraction', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const Text(
+              'Assign Fraction',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 16),
             if (users.isEmpty)
-              const Text('No users available. Add users in the Network Tree first.')
+              const Text(
+                'No users available. Add users in the Network Tree first.',
+              )
             else
               Expanded(
                 child: ListView.builder(
                   itemCount: users.length,
                   itemBuilder: (context, index) => ListTile(
-                    leading: CircleAvatar(backgroundColor: vibrantAccent.withOpacity(0.1), child: const Icon(Icons.person, color: vibrantAccent)),
-                    title: Text(users[index].name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    leading: CircleAvatar(
+                      backgroundColor: vibrantAccent.withOpacity(0.1),
+                      child: const Icon(Icons.person, color: vibrantAccent),
+                    ),
+                    title: Text(
+                      users[index].name,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     subtitle: Text(users[index].email),
                     trailing: ElevatedButton(
                       onPressed: () {
-                        Provider.of<PropertyProvider>(context, listen: false).assignFraction(propId, unitId, fractionId, users[index].id);
+                        Provider.of<PropertyProvider>(
+                          context,
+                          listen: false,
+                        ).assignFraction(
+                          propId,
+                          unitId,
+                          fractionId,
+                          users[index].id,
+                        );
                         Navigator.pop(context);
                       },
-                      style: ElevatedButton.styleFrom(backgroundColor: textDark, foregroundColor: Colors.white),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: textDark,
+                        foregroundColor: Colors.white,
+                      ),
                       child: const Text('Assign'),
                     ),
                   ),
                 ),
-              )
+              ),
           ],
         ),
       ),
     );
   }
 
-  void _showManageAssignedFractionDialog(BuildContext context, String propId, String unitId, Fraction fraction) {
+  void _showManageAssignedFractionDialog(
+    BuildContext context,
+    String propId,
+    String unitId,
+    Fraction fraction,
+  ) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Manage Fraction'),
-        content: const Text('This fraction is already assigned to a user. Do you want to revoke their ownership?'),
+        content: const Text(
+          'This fraction is already assigned to a user. Do you want to revoke their ownership?',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () {
-              Provider.of<PropertyProvider>(context, listen: false).unassignFraction(propId, unitId, fraction.id);
+              Provider.of<PropertyProvider>(
+                context,
+                listen: false,
+              ).unassignFraction(propId, unitId, fraction.id);
               Navigator.pop(context);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Revoke Ownership'),
-          )
+          ),
         ],
       ),
     );

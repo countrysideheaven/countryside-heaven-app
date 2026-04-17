@@ -47,11 +47,11 @@ class AdminDashboardScreen extends StatelessWidget {
 
     String revenueDisplay;
     if (totalRevenue >= 1000000) {
-      revenueDisplay = '\$${(totalRevenue / 1000000).toStringAsFixed(1)}M';
+      revenueDisplay = '\₹${(totalRevenue / 1000000).toStringAsFixed(1)}M';
     } else if (totalRevenue >= 1000) {
-      revenueDisplay = '\$${(totalRevenue / 1000).toStringAsFixed(1)}K';
+      revenueDisplay = '\₹${(totalRevenue / 1000).toStringAsFixed(1)}K';
     } else {
-      revenueDisplay = '\$${totalRevenue.toStringAsFixed(0)}';
+      revenueDisplay = '\₹${totalRevenue.toStringAsFixed(0)}';
     }
 
     // 2. Network Sizes
