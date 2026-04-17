@@ -75,10 +75,13 @@ class ClientPortfolioScreen extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(user.email, style: const TextStyle(color: Colors.white70, fontSize: 14)),
                         const SizedBox(height: 8),
-                        Row(
+                        
+                        // 👉 FIXED: Wrapped in Wrap widget to prevent RenderFlex overflow
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
                           children: [
                             Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: vibrantAccent.withOpacity(0.2), borderRadius: BorderRadius.circular(8)), child: Text('Role: ${user.role.name.toUpperCase()}', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: vibrantAccent))),
-                            const SizedBox(width: 8),
                             Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(8)), child: Text('Code: ${user.myReferralCode}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white))),
                           ],
                         )
@@ -91,7 +94,7 @@ class ClientPortfolioScreen extends StatelessWidget {
             const SizedBox(height: 40),
 
             // ASSETS SECTION
-            Text('Owned Assets 🏢', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textDark)),
+            Text('Owned Assets 🏠', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: textDark)),
             const SizedBox(height: 16),
             if (ownedFractions.isEmpty)
               _buildEmptyState(Icons.landscape_rounded, 'No assets yet', 'This user hasn\'t purchased any fractions.')
