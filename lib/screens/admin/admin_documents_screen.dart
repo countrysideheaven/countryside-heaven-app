@@ -32,6 +32,16 @@ class _AdminDocumentsScreenState extends State<AdminDocumentsScreen> {
     final provider = Provider.of<PropertyProvider>(context);
     final documents = provider.documents;
 
+    // ---> NEW: Group documents by user name (stored in doc.userId in the provider)
+    final Map<String, List<dynamic>> groupedDocuments = {};
+    for (var doc in documents) {
+      final String folderName = doc.userId;
+      if (!groupedDocuments.containsKey(folderName)) {
+        groupedDocuments[folderName] = [];
+      }
+      groupedDocuments[folderName]!.add(doc);
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F9),
       body: SingleChildScrollView(
@@ -46,7 +56,6 @@ class _AdminDocumentsScreenState extends State<AdminDocumentsScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 👉 NEW: Dynamic Back Button (Only shows if pushed from Dashboard)
                   if (Navigator.canPop(context))
                     Padding(
                       padding: const EdgeInsets.only(right: 16.0, top: 4.0),
@@ -82,10 +91,10 @@ class _AdminDocumentsScreenState extends State<AdminDocumentsScreen> {
               ),
             ),
             
-            // --- DOCUMENT LIST ---
+            // --- DOCUMENT LIST (NOW ORGANIZED INTO FOLDERS) ---
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: documents.isEmpty
+              child: groupedDocuments.isEmpty
                 ? Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(40),
@@ -102,70 +111,103 @@ class _AdminDocumentsScreenState extends State<AdminDocumentsScreen> {
                 : ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: documents.length,
+                    itemCount: groupedDocuments.length,
                     itemBuilder: (context, index) {
-                      final doc = documents[index];
-                      final isPending = doc.status == 'pending';
-                      final isApproved = doc.status == 'approved';
+                      final userName = groupedDocuments.keys.elementAt(index);
+                      final userDocs = groupedDocuments[userName]!;
+                      
+                      // Check if any documents in this folder are pending
+                      final hasPendingDocs = userDocs.any((doc) => doc.status == 'pending');
 
+                      // FOLDER UI
                       return Container(
                         margin: const EdgeInsets.only(bottom: 16),
-                        padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10, offset: const Offset(0, 4))],
                         ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(color: const Color(0xFFF7F7F9), borderRadius: BorderRadius.circular(16)),
-                              child: Icon(Icons.picture_as_pdf_rounded, color: isApproved ? Colors.green : vibrantAccent, size: 32),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(doc.fileName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textDark)),
-                                  const SizedBox(height: 4),
-                                  Text('Assigned to: ${doc.userId}', style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w600)),
-                                ],
+                        child: Theme(
+                          // Removes the default borders from the ExpansionTile
+                          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                          child: ExpansionTile(
+                            tilePadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                            leading: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: hasPendingDocs ? vibrantAccent.withOpacity(0.1) : const Color(0xFF6366F1).withOpacity(0.1), 
+                                borderRadius: BorderRadius.circular(16)
+                              ),
+                              child: Icon(
+                                hasPendingDocs ? Icons.folder_special_rounded : Icons.folder_shared_rounded, 
+                                color: hasPendingDocs ? vibrantAccent : const Color(0xFF6366F1), 
+                                size: 28
                               ),
                             ),
-                            
-                            if (doc.fileUrl != null && doc.fileUrl!.isNotEmpty)
-                              IconButton(
-                                onPressed: () => _openDocument(doc.fileUrl!),
-                                icon: const Icon(Icons.visibility_rounded, color: Colors.blue),
-                                tooltip: 'View Document',
-                                style: IconButton.styleFrom(backgroundColor: Colors.blue.withOpacity(0.1)),
-                              ),
-                            const SizedBox(width: 8),
+                            title: Text(userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: textDark)),
+                            subtitle: Text('${userDocs.length} Document(s)', style: TextStyle(color: Colors.grey.shade600, fontSize: 13, fontWeight: FontWeight.w600)),
+                            childrenPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                            children: userDocs.map((doc) {
+                              final isPending = doc.status == 'pending';
+                              final isApproved = doc.status == 'approved';
 
-                            if (isPending) ...[
-                              IconButton(
-                                onPressed: () => provider.updateDocumentStatus(doc.id, 'rejected'),
-                                icon: const Icon(Icons.close_rounded, color: Colors.red),
-                                tooltip: 'Reject',
-                                style: IconButton.styleFrom(backgroundColor: Colors.red.withOpacity(0.1)),
-                              ),
-                              const SizedBox(width: 8),
-                              IconButton(
-                                onPressed: () => provider.updateDocumentStatus(doc.id, 'approved'),
-                                icon: const Icon(Icons.check_rounded, color: Colors.green),
-                                tooltip: 'Approve',
-                                style: IconButton.styleFrom(backgroundColor: Colors.green.withOpacity(0.1)),
-                              ),
-                            ] else ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                decoration: BoxDecoration(color: isApproved ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                                child: Text(doc.status.toUpperCase(), style: TextStyle(color: isApproved ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 12)),
-                              )
-                            ]
-                          ],
+                              // NESTED DOCUMENT UI
+                              return Container(
+                                margin: const EdgeInsets.only(top: 12),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF7F7F9), // Slight gray background for nested effect
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: Colors.grey.shade200),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.picture_as_pdf_rounded, color: isApproved ? Colors.green : vibrantAccent, size: 28),
+                                    const SizedBox(width: 16),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(doc.fileName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: textDark)),
+                                        ],
+                                      ),
+                                    ),
+                                    
+                                    if (doc.fileUrl != null && doc.fileUrl!.isNotEmpty)
+                                      IconButton(
+                                        onPressed: () => _openDocument(doc.fileUrl!),
+                                        icon: const Icon(Icons.visibility_rounded, color: Colors.blue, size: 20),
+                                        tooltip: 'View Document',
+                                        style: IconButton.styleFrom(backgroundColor: Colors.blue.withOpacity(0.1)),
+                                      ),
+                                    const SizedBox(width: 4),
+
+                                    if (isPending) ...[
+                                      IconButton(
+                                        onPressed: () => provider.updateDocumentStatus(doc.id, 'rejected'),
+                                        icon: const Icon(Icons.close_rounded, color: Colors.red, size: 20),
+                                        tooltip: 'Reject',
+                                        style: IconButton.styleFrom(backgroundColor: Colors.red.withOpacity(0.1)),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      IconButton(
+                                        onPressed: () => provider.updateDocumentStatus(doc.id, 'approved'),
+                                        icon: const Icon(Icons.check_rounded, color: Colors.green, size: 20),
+                                        tooltip: 'Approve',
+                                        style: IconButton.styleFrom(backgroundColor: Colors.green.withOpacity(0.1)),
+                                      ),
+                                    ] else ...[
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                        decoration: BoxDecoration(color: isApproved ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                                        child: Text(doc.status.toUpperCase(), style: TextStyle(color: isApproved ? Colors.green : Colors.red, fontWeight: FontWeight.bold, fontSize: 11)),
+                                      )
+                                    ]
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
                         ),
                       );
                     },

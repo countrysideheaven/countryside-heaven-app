@@ -1,12 +1,27 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart'; 
 import 'package:minio/minio.dart'; 
 import '../models/property_models.dart';
 
+// 👉 NEW: Define environment variables at compile-time
+const String _r2Endpoint = String.fromEnvironment('R2_ENDPOINT', defaultValue: '');
+const String _r2AccessKey = String.fromEnvironment('R2_ACCESS_KEY', defaultValue: '');
+const String _r2SecretKey = String.fromEnvironment('R2_SECRET_KEY', defaultValue: '');
+const String _r2BucketName = String.fromEnvironment('R2_BUCKET_NAME', defaultValue: '');
+const String _r2PublicUrl = String.fromEnvironment('R2_PUBLIC_URL', defaultValue: '');
+
 class PropertyProvider extends ChangeNotifier {
   final _supabase = Supabase.instance.client;
+
+  // 👉 NEW: Initialize Minio client once for the entire provider
+  final Minio _minio = Minio(
+    endPoint: _r2Endpoint,
+    accessKey: _r2AccessKey,
+    secretKey: _r2SecretKey,
+    region: 'auto',
+    useSSL: true,
+  );
 
   List<Property> _properties = [];
   List<Property> get properties => _properties;
@@ -19,6 +34,13 @@ class PropertyProvider extends ChangeNotifier {
 
   PropertyProvider() {
     fetchData();
+  }
+
+  // --- Utility check to ensure variables loaded correctly ---
+  void _verifyR2Variables() {
+    if (_r2Endpoint.isEmpty || _r2AccessKey.isEmpty || _r2SecretKey.isEmpty || _r2BucketName.isEmpty || _r2PublicUrl.isEmpty) {
+      throw Exception("Missing one or more R2 variables. Ensure app was built with --dart-define-from-file or --dart-define flags.");
+    }
   }
 
   Future<void> fetchData() async {
@@ -59,7 +81,6 @@ class PropertyProvider extends ChangeNotifier {
         name: propMap['name'], 
         location: propMap['location'],
         description: propMap['description'] ?? '', 
-        // Ensure we handle the JSON array of URLs correctly
         imageUrls: propMap['image_urls'] != null ? List<String>.from(propMap['image_urls']) : [],
         units: units
       );
@@ -97,36 +118,14 @@ class PropertyProvider extends ChangeNotifier {
   // 🚀 CLOUDFLARE R2 UPLOAD LOGIC 🚀 
   // ==========================================
   
-  // ==========================================
-  // 🚀 CLOUDFLARE R2 UPLOAD LOGIC 🚀 
-  // ==========================================
-  
   Future<void> uploadAdminDocument(String userId, String documentName, Uint8List fileBytes, String extension) async {
     try {
+      _verifyR2Variables(); // Validate config before network call
       final uniqueFileName = '${userId}_${DateTime.now().millisecondsSinceEpoch}.$extension';
       
-      // 1. Match your EXACT .env keys
-      final r2Endpoint = dotenv.env['R2_ENDPOINT']; 
-      final accessKey = dotenv.env['R2_ACCESS_KEY'];
-      final secretKey = dotenv.env['R2_SECRET_KEY'];
-      final bucketName = dotenv.env['R2_BUCKET_NAME'];
-      final publicUrlBase = dotenv.env['R2_PUBLIC_URL'];
+      await _minio.putObject(_r2BucketName, uniqueFileName, Stream.value(fileBytes), size: fileBytes.length);
 
-      if (r2Endpoint == null || accessKey == null || secretKey == null || bucketName == null || publicUrlBase == null) {
-        throw Exception("Missing one or more R2 variables in .env file.");
-      }
-
-      final minio = Minio(
-        endPoint: r2Endpoint, // Using the full endpoint directly from .env
-        accessKey: accessKey, 
-        secretKey: secretKey, 
-        region: 'auto', 
-        useSSL: true
-      );
-
-      await minio.putObject(bucketName, uniqueFileName, Stream.value(fileBytes), size: fileBytes.length);
-
-      final String r2FileUrl = publicUrlBase.endsWith('/') ? '$publicUrlBase$uniqueFileName' : '$publicUrlBase/$uniqueFileName';
+      final String r2FileUrl = _r2PublicUrl.endsWith('/') ? '$_r2PublicUrl$uniqueFileName' : '$_r2PublicUrl/$uniqueFileName';
 
       await _supabase.from('documents').insert({
         'user_id': userId, 'file_name': documentName, 'file_url': r2FileUrl, 'status': 'approved', 
@@ -139,29 +138,16 @@ class PropertyProvider extends ChangeNotifier {
     }
   }
 
-// ---> NEW: Customer KYC Upload (Sets status to 'pending')
   Future<void> uploadKycDocument(String userId, String documentName, Uint8List fileBytes, String extension) async {
     try {
+      _verifyR2Variables(); // Validate config before network call
       final cleanName = documentName.replaceAll(RegExp(r'[^a-zA-Z0-9.]'), '_');
       final uniqueFileName = 'kyc/${userId}_${DateTime.now().millisecondsSinceEpoch}.$extension';
       
-      final r2Endpoint = dotenv.env['R2_ENDPOINT']; 
-      final accessKey = dotenv.env['R2_ACCESS_KEY'];
-      final secretKey = dotenv.env['R2_SECRET_KEY'];
-      final bucketName = dotenv.env['R2_BUCKET_NAME'];
-      final publicUrlBase = dotenv.env['R2_PUBLIC_URL'];
+      await _minio.putObject(_r2BucketName, uniqueFileName, Stream.value(fileBytes), size: fileBytes.length);
 
-      if (r2Endpoint == null || accessKey == null || secretKey == null || bucketName == null || publicUrlBase == null) {
-        throw Exception("Missing one or more R2 variables in .env file.");
-      }
+      final String r2FileUrl = _r2PublicUrl.endsWith('/') ? '$_r2PublicUrl$uniqueFileName' : '$_r2PublicUrl/$uniqueFileName';
 
-      final minio = Minio(endPoint: r2Endpoint, accessKey: accessKey, secretKey: secretKey, region: 'auto', useSSL: true);
-
-      await minio.putObject(bucketName, uniqueFileName, Stream.value(fileBytes), size: fileBytes.length);
-
-      final String r2FileUrl = publicUrlBase.endsWith('/') ? '$publicUrlBase$uniqueFileName' : '$publicUrlBase/$uniqueFileName';
-
-      // Note: Status is 'pending' for Admin approval
       await _supabase.from('documents').insert({
         'user_id': userId, 'file_name': cleanName, 'file_url': r2FileUrl, 'status': 'pending', 
       });
@@ -173,45 +159,22 @@ class PropertyProvider extends ChangeNotifier {
     }
   }
 
-
   Future<String> uploadPropertyImage(Uint8List fileBytes, String originalFileName) async {
     try {
+      _verifyR2Variables(); // Validate config before network call
       final cleanName = originalFileName.replaceAll(RegExp(r'[^a-zA-Z0-9.]'), '_');
       final uniqueFileName = 'properties/${DateTime.now().millisecondsSinceEpoch}_$cleanName';
-      
-      // 1. Match your EXACT .env keys
-      final r2Endpoint = dotenv.env['R2_ENDPOINT']; 
-      final accessKey = dotenv.env['R2_ACCESS_KEY'];
-      final secretKey = dotenv.env['R2_SECRET_KEY'];
-      final bucketName = dotenv.env['R2_BUCKET_NAME'];
-      final publicUrlBase = dotenv.env['R2_PUBLIC_URL'];
 
-      // 2. Safe check so it tells us exactly what is wrong instead of a blind null error
-      if (r2Endpoint == null) throw Exception("Missing R2_ENDPOINT");
-      if (accessKey == null) throw Exception("Missing R2_ACCESS_KEY");
-      if (secretKey == null) throw Exception("Missing R2_SECRET_KEY");
-      if (bucketName == null) throw Exception("Missing R2_BUCKET_NAME");
-      if (publicUrlBase == null) throw Exception("Missing R2_PUBLIC_URL");
+      await _minio.putObject(_r2BucketName, uniqueFileName, Stream.value(fileBytes), size: fileBytes.length);
 
-      final minio = Minio(
-        endPoint: r2Endpoint, // Using the full endpoint directly from .env
-        accessKey: accessKey, 
-        secretKey: secretKey, 
-        region: 'auto', 
-        useSSL: true
-      );
-
-      // Upload to R2
-      await minio.putObject(bucketName, uniqueFileName, Stream.value(fileBytes), size: fileBytes.length);
-
-      // Construct and return the public URL
-      final String r2FileUrl = publicUrlBase.endsWith('/') ? '$publicUrlBase$uniqueFileName' : '$publicUrlBase/$uniqueFileName';
+      final String r2FileUrl = _r2PublicUrl.endsWith('/') ? '$_r2PublicUrl$uniqueFileName' : '$_r2PublicUrl/$uniqueFileName';
       return r2FileUrl;
     } catch (e) {
       debugPrint('🚨 Error uploading property image to R2: $e');
       rethrow;
     }
   }
+
   // --- CRUD Operations ---
   
   Future<String> addProperty(String name, String location, int unitCount, double initialFractionPrice) async {
@@ -225,16 +188,13 @@ class PropertyProvider extends ChangeNotifier {
     return propertyId; 
   }
 
-  // ---> NEW: Updates the property in Supabase with the descriptions and the new R2 URLs
   Future<void> updatePropertyExtraData(String propertyId, String description, List<String> imageUrls) async {
     try {
-      // 1. Update Supabase Database
       await _supabase.from('properties').update({
         'description': description,
-        'image_urls': imageUrls, // Supabase automatically handles List<String> as a JSONB/Array column
+        'image_urls': imageUrls, 
       }).eq('id', propertyId);
 
-      // 2. Update Local State to reflect immediately
       final index = _properties.indexWhere((p) => p.id == propertyId);
       if (index != -1) {
         _properties[index].description = description;
