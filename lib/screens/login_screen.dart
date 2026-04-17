@@ -11,7 +11,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController(); // Added for password support
+  final _passwordController = TextEditingController(); 
   bool _isLoading = false;
 
   final Color bgDark = const Color(0xFF111111);
@@ -25,7 +25,6 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  // Updated to handle both email and password
   Future<void> _handleLogin(String email, String password) async {
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter both email and password')));
@@ -78,13 +77,25 @@ class _LoginScreenState extends State<LoginScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(color: vibrantAccent.withOpacity(0.1), shape: BoxShape.circle),
-                      child: Icon(Icons.rocket_launch_rounded, color: vibrantAccent, size: 48),
+                    // 👉 NEW: Replaced the Rocket Icon with the Company Logo
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        height: 80,
+                        width: 80,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                     const SizedBox(height: 24),
-                    const Text('Countryside', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFF111111), letterSpacing: -1)),
+                    
+                    // 👉 NEW: Updated Text to Full Company Name
+                    const Text(
+                      'Countryside Heaven', 
+                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Color(0xFF111111), letterSpacing: -1),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
                     Text('Fractional Real Estate, Fast.', style: TextStyle(fontSize: 14, color: Colors.grey.shade500, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 40),
 
@@ -138,7 +149,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     Text('Quick Dev Login', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey.shade400)),
                     const SizedBox(height: 16),
                     
-                    // Unified Dev Buttons for all roles
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -164,7 +174,7 @@ class _LoginScreenState extends State<LoginScreen> {
     return InkWell(
       onTap: () {
         _emailController.text = email;
-        _passwordController.text = 'password@123'; // Standard test password
+        _passwordController.text = 'password@123'; 
         _handleLogin(email, 'password@123');
       },
       child: Container(

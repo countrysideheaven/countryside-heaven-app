@@ -48,15 +48,51 @@ class _PartnerMainScreenState extends State<PartnerMainScreen> {
       appBar: AppBar(
         backgroundColor: bgLight,
         elevation: 0,
+        centerTitle: false,
         title: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: partnerAccent.withOpacity(0.1), shape: BoxShape.circle),
-              child: Icon(Icons.handshake_rounded, color: partnerAccent, size: 20),
+            // 👉 NEW: The Company Logo
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                'assets/images/logo.png',
+                height: 36,
+                width: 36,
+                fit: BoxFit.cover,
+              ),
             ),
             const SizedBox(width: 12),
-            Text('Partner Hub', style: TextStyle(color: textDark, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: -0.5)),
+            
+            // 👉 NEW: Company Name with Subtext (Wrapped in Flexible to prevent overflow)
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Countryside Heaven',
+                    style: TextStyle(
+                      fontSize: 18, 
+                      fontWeight: FontWeight.w900, 
+                      color: Color(0xFF111111), 
+                      letterSpacing: -0.5,
+                      height: 1.1,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'Partner Hub',
+                    style: TextStyle(
+                      fontSize: 12, 
+                      fontWeight: FontWeight.w800, 
+                      color: partnerAccent,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
         actions: [
@@ -165,7 +201,7 @@ class _PartnerMainScreenState extends State<PartnerMainScreen> {
               children: [
                 const Text('Total Commission Earned', style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
-                Text('\$${myEarnings.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900, letterSpacing: -1)),
+                Text('₹${myEarnings.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900, letterSpacing: -1)),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -179,7 +215,7 @@ class _PartnerMainScreenState extends State<PartnerMainScreen> {
 
           Row(
             children: [
-              Expanded(child: _buildStatCard('Total Volume', '\$${(totalSalesVolume / 1000).toStringAsFixed(1)}K', Icons.trending_up_rounded, const Color(0xFF22C55E))),
+              Expanded(child: _buildStatCard('Total Volume', '₹${(totalSalesVolume / 1000).toStringAsFixed(1)}K', Icons.trending_up_rounded, const Color(0xFF22C55E))),
               const SizedBox(width: 16),
               Expanded(child: _buildStatCard('Active Clients', '${directClients.length}', Icons.groups_rounded, const Color(0xFF6366F1))),
             ],
@@ -357,9 +393,12 @@ class _PartnerMainScreenState extends State<PartnerMainScreen> {
                           height: 180,
                           width: double.infinity,
                           child: prop.imageUrls.isNotEmpty
-                              ? (kIsWeb
-                                  ? Image.network(prop.imageUrls.first, fit: BoxFit.cover, errorBuilder: (c, e, s) => _buildFallbackBanner())
-                                  : Image.file(File(prop.imageUrls.first), fit: BoxFit.cover, errorBuilder: (c, e, s) => _buildFallbackBanner()))
+                              // 👉 FIXED: Always use Image.network because R2 URLs are web links!
+                              ? Image.network(
+                                  prop.imageUrls.first, 
+                                  fit: BoxFit.cover, 
+                                  errorBuilder: (context, error, stackTrace) => _buildFallbackBanner(),
+                                )
                               : _buildFallbackBanner(),
                         ),
                         Padding(
@@ -387,7 +426,7 @@ class _PartnerMainScreenState extends State<PartnerMainScreen> {
                                 ],
                               ),
                               const SizedBox(height: 16),
-                              Text('Fractions from \$${startingPrice.toStringAsFixed(0)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: textDark)),
+                              Text('Fractions from ₹${startingPrice.toStringAsFixed(0)}', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: textDark)),
                             ],
                           ),
                         )
@@ -571,8 +610,6 @@ class _PartnerMainScreenState extends State<PartnerMainScreen> {
                           try {
                             final authProv = Provider.of<AuthProvider>(context, listen: false);
                             await authProv.updateBrandingDetails(companyNameCtrl.text, phoneCtrl.text);
-                            
-                            // (Optional: Wire up logoBytes upload to R2 here later just like documents)
                             
                             if (context.mounted) {
                               Navigator.pop(context);

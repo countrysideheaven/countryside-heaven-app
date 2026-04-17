@@ -1,5 +1,3 @@
-import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../models/property_models.dart';
 
@@ -58,9 +56,19 @@ class _CustomerPropertyDetailsScreenState extends State<CustomerPropertyDetailsS
                           onPageChanged: (index) => setState(() => _currentImageIndex = index),
                           itemBuilder: (context, index) {
                             final url = widget.property.imageUrls[index];
-                            return kIsWeb
-                                ? Image.network(url, fit: BoxFit.cover)
-                                : Image.file(File(url), fit: BoxFit.cover);
+                            // 👉 FIXED: R2 URLs are always network links, regardless of the platform
+                            return Image.network(
+                              url, 
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: Colors.grey.shade200, 
+                                child: Center(child: Icon(Icons.broken_image_rounded, size: 50, color: Colors.grey.shade400))
+                              ),
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Center(child: CircularProgressIndicator(color: customerAccent));
+                              },
+                            );
                           },
                         ),
                       
@@ -143,15 +151,19 @@ class _CustomerPropertyDetailsScreenState extends State<CustomerPropertyDetailsS
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(unit.name, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: textDark)),
-                                  const SizedBox(height: 4),
-                                  Text('${unit.availableFractions} / ${unit.fractions.length} Fractions Left', style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.bold, fontSize: 13)),
-                                ],
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(unit.name, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18, color: textDark)),
+                                    const SizedBox(height: 4),
+                                    Text('${unit.availableFractions} / ${unit.fractions.length} Fractions Left', style: TextStyle(color: Colors.grey.shade500, fontWeight: FontWeight.bold, fontSize: 13)),
+                                  ],
+                                ),
                               ),
-                              Text('\$${unit.fractionPrice.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: customerAccent)),
+                              const SizedBox(width: 12),
+                              // 👉 FIXED: Currency updated and handled for large strings
+                              Text('₹${unit.fractionPrice.toStringAsFixed(0)}', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 20, color: customerAccent)),
                             ],
                           ),
                         );
@@ -163,27 +175,37 @@ class _CustomerPropertyDetailsScreenState extends State<CustomerPropertyDetailsS
             ],
           ),
 
-          // Fixed Bottom Action Bar
+          // 👉 FIXED: Bottom Action Bar Layout Overflow
           Positioned(
             bottom: 0, left: 0, right: 0,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               decoration: BoxDecoration(
                 color: Colors.white,
                 boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -10))],
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('Starts at', style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.bold)),
-                      Text('\$${widget.startingPrice.toStringAsFixed(0)}', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: textDark, letterSpacing: -1)),
-                    ],
+                  // Wrapped the price column in an Expanded widget
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Starts at', style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.bold)),
+                        Text(
+                          '₹${widget.startingPrice.toStringAsFixed(0)}', 
+                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textDark, letterSpacing: -1),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 16), // Added spacing between price and button
+                  
+                  // Adjusted button padding to be slightly more responsive
                   ElevatedButton(
                     onPressed: () {
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -195,11 +217,11 @@ class _CustomerPropertyDetailsScreenState extends State<CustomerPropertyDetailsS
                     style: ElevatedButton.styleFrom(
                       backgroundColor: textDark,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                       elevation: 0,
                     ),
-                    child: const Text('Express Interest ⚡️', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                    child: const Text('Express Interest ⚡️', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                   )
                 ],
               ),
