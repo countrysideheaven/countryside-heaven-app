@@ -44,15 +44,36 @@ class _CustomerMainScreenState extends State<CustomerMainScreen> {
       appBar: AppBar(
         backgroundColor: bgLight,
         elevation: 0,
+        centerTitle: false,
         title: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(color: customerAccent.withOpacity(0.1), shape: BoxShape.circle),
-              child: Icon(Icons.eco_rounded, color: customerAccent, size: 20),
+            // 👉 NEW: The Company Logo
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                'assets/images/logo.png',
+                height: 36,
+                width: 36,
+                fit: BoxFit.cover,
+              ),
             ),
             const SizedBox(width: 12),
-            Text('Countryside', style: TextStyle(color: textDark, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: -0.5)),
+            
+            // 👉 NEW: Company Name (Wrapped in Flexible to prevent overflow)
+            Flexible(
+              child: Text(
+                'Countryside Heaven',
+                style: TextStyle(
+                  color: textDark, 
+                  fontWeight: FontWeight.w900, 
+                  fontSize: 20, 
+                  letterSpacing: -0.5,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
       ),
@@ -234,10 +255,17 @@ class _CustomerMainScreenState extends State<CustomerMainScreen> {
             SizedBox(
               height: 180,
               width: double.infinity,
+              // 👉 FIXED: Image loading strictly via Network for R2 URLs
               child: property.imageUrls.isNotEmpty
-                  ? (kIsWeb
-                      ? Image.network(property.imageUrls.first, fit: BoxFit.cover, errorBuilder: (c, e, s) => _buildFallbackBanner())
-                      : Image.file(File(property.imageUrls.first), fit: BoxFit.cover, errorBuilder: (c, e, s) => _buildFallbackBanner()))
+                  ? Image.network(
+                      property.imageUrls.first, 
+                      fit: BoxFit.cover, 
+                      errorBuilder: (c, e, s) => _buildFallbackBanner(),
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Center(child: CircularProgressIndicator(color: customerAccent));
+                      },
+                    )
                   : _buildFallbackBanner(),
             ),
             Padding(
@@ -275,7 +303,8 @@ class _CustomerMainScreenState extends State<CustomerMainScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Fraction starts at', style: TextStyle(color: Colors.grey.shade500, fontSize: 12, fontWeight: FontWeight.bold)),
-                          Text('\$${startingPrice.toStringAsFixed(0)}', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textDark)),
+                          // 👉 FIXED: Currency updated to Rupee
+                          Text('₹${startingPrice.toStringAsFixed(0)}', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textDark)),
                         ],
                       ),
                       ElevatedButton(
@@ -351,7 +380,8 @@ class _CustomerMainScreenState extends State<CustomerMainScreen> {
               children: [
                 const Text('Total Asset Value', style: TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
-                Text('\$${totalPortfolioValue.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900, letterSpacing: -1)),
+                // 👉 FIXED: Currency updated to Rupee
+                Text('₹${totalPortfolioValue.toStringAsFixed(0)}', style: const TextStyle(color: Colors.white, fontSize: 40, fontWeight: FontWeight.w900, letterSpacing: -1)),
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -649,7 +679,6 @@ class _CustomerMainScreenState extends State<CustomerMainScreen> {
 
                           setState(() => isUploading = true);
                           try {
-                            // Uses the new function that sets status to 'pending'
                             await propertyProvider.uploadKycDocument(user.id, fileName!, fileBytes!, fileExt!);
                             if (context.mounted) {
                               Navigator.pop(context);
