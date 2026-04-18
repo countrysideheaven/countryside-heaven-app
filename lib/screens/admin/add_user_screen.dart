@@ -144,32 +144,52 @@ class _AddUserScreenState extends State<AddUserScreen> {
     );
   }
 
-  void _submitForm() {
+  void _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      // 1. Grab the provider
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final currentUser = authProvider.currentUser!;
       
-      // 2. Register the user via our mock database logic
-      authProvider.registerUser(
-        _nameController.text.trim(),
-        _emailController.text.trim(),
-        _selectedRole,
-        enteredReferralCode: _referralController.text.trim(),
-      );
+      // 👉 THE FIX: If the admin leaves the field blank, automatically use the admin's own code
+      String referralCodeToUse = _referralController.text.trim();
+      if (referralCodeToUse.isEmpty) {
+        referralCodeToUse = currentUser.myReferralCode; 
+      }
 
-      // 3. Show a bouncy success snackbar
+      // Show a loading indicator while creating the user (optional but good practice)
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${_nameController.text} added to the network! 🎉', style: const TextStyle(fontWeight: FontWeight.bold)),
-          backgroundColor: Colors.green.shade600,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          margin: const EdgeInsets.all(16),
-        ),
+        const SnackBar(content: Text('Creating account securely...'), duration: Duration(seconds: 1)),
       );
 
-      // 4. Pop back to dashboard
-      Navigator.pop(context);
+      try {
+        await authProvider.registerUser(
+          _nameController.text.trim(),
+          _emailController.text.trim(),
+          _selectedRole,
+          enteredReferralCode: referralCodeToUse, // Automatically links them to the Admin!
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${_nameController.text} added to the network! 🎉', style: const TextStyle(fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.green.shade600,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to create user. Email might already exist.', style: const TextStyle(fontWeight: FontWeight.bold)),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 
