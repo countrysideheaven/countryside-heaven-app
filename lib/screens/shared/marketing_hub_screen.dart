@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:file_picker/file_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 // Robust Conditional Import
 import 'dart:html' if (dart.library.io) 'package:countryside_heaven_app/screens/shared/mock_html.dart' as html;
 
 import '../../providers/auth_provider.dart';
+import '../../providers/property_provider.dart';
 import '../../models/app_user.dart';
 
 class MarketingAsset {
@@ -16,8 +19,9 @@ class MarketingAsset {
   final String title;
   final String url;
   final bool isVideo;
+  final String category;
 
-  MarketingAsset({required this.id, required this.title, required this.url, required this.isVideo});
+  MarketingAsset({required this.id, required this.title, required this.url, required this.isVideo, required this.category});
 }
 
 class MarketingHubScreen extends StatefulWidget {
@@ -32,22 +36,55 @@ class _MarketingHubScreenState extends State<MarketingHubScreen> {
   final Color textDark = const Color(0xFF111111);
   final Color partnerAccent = const Color(0xFF8B5CF6);
 
+  String _searchQuery = '';
+  String _selectedCategory = 'All';
+
   List<MarketingAsset> assets = [
-    MarketingAsset(
-      id: '1', 
-      title: 'Luxury Villa Campaign', 
-      url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=1000&auto=format&fit=crop', 
-      isVideo: false
-    ),
-    MarketingAsset(id: '2', title: 'Fractional Promo Video', url: 'dummy_video.mp4', isVideo: true),
-    MarketingAsset(id: '3', title: 'High Yield Investment', url: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1000&auto=format&fit=crop', isVideo: false),
+    // Fallback data while DB loads
+    MarketingAsset(id: '1', title: 'Luxury Villa Campaign', url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=1000&auto=format&fit=crop', isVideo: false, category: 'Company Brand'),
+    MarketingAsset(id: '3', title: 'High Yield Investment', url: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?q=80&w=1000&auto=format&fit=crop', isVideo: false, category: 'Company Brand'),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAssets();
+  }
+
+  Future<void> _fetchAssets() async {
+    try {
+      final supabase = Supabase.instance.client;
+      final data = await supabase.from('marketing_assets').select().order('created_at', ascending: false);
+      
+      if (mounted) {
+        setState(() {
+          assets = data.map((item) => MarketingAsset(
+            id: item['id'].toString(),
+            title: item['title'],
+            url: item['url'],
+            isVideo: item['is_video'],
+            category: item['category'] ?? 'Company Brand',
+          )).toList();
+        });
+      }
+    } catch (e) {
+      debugPrint("Marketing assets table not found or error: $e");
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+    final propertyProvider = Provider.of<PropertyProvider>(context);
     final user = authProvider.currentUser!;
     final isAdmin = user.role == UserRole.admin;
+
+    // Filter Logic
+    final filteredAssets = assets.where((a) {
+      final matchesSearch = a.title.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesCategory = _selectedCategory == 'All' || a.category == _selectedCategory;
+      return matchesSearch && matchesCategory;
+    }).toList();
 
     return Scaffold(
       backgroundColor: bgLight,
@@ -58,12 +95,12 @@ class _MarketingHubScreenState extends State<MarketingHubScreen> {
         title: Text('Marketing Hub 📢', style: TextStyle(color: textDark, fontWeight: FontWeight.w900, fontSize: 22, letterSpacing: -0.5)),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
@@ -81,78 +118,276 @@ class _MarketingHubScreenState extends State<MarketingHubScreen> {
                 ),
                 if (isAdmin)
                   ElevatedButton.icon(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Upload flow ready to be wired!')));
-                    },
+                    onPressed: () => _showUploadDialog(context, propertyProvider),
                     icon: const Icon(Icons.upload_rounded, size: 20),
                     label: const Text('Upload'),
                     style: ElevatedButton.styleFrom(backgroundColor: textDark, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
                   )
               ],
             ),
-            const SizedBox(height: 32),
+          ),
 
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: kIsWeb ? 4 : 2, 
-                crossAxisSpacing: 16, 
-                mainAxisSpacing: 16, 
-                childAspectRatio: 0.85
+          // Search Bar
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: TextField(
+              onChanged: (val) => setState(() => _searchQuery = val),
+              decoration: InputDecoration(
+                hintText: 'Search marketing materials...',
+                prefixIcon: Icon(Icons.search_rounded, color: Colors.grey.shade500),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(vertical: 16),
               ),
-              itemCount: assets.length,
-              itemBuilder: (context, index) {
-                final asset = assets[index];
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => MarketingAssetDetailsScreen(asset: asset, user: user)));
-                  },
-                  child: Container(
-                    clipBehavior: Clip.antiAlias,
-                    decoration: BoxDecoration(
-                      color: Colors.white, 
-                      borderRadius: BorderRadius.circular(24), 
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 5))]
-                    ),
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        asset.isVideo 
-                            ? Container(color: Colors.black87, child: const Center(child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 48)))
-                            : Image.network(asset.url, fit: BoxFit.cover),
-                        
-                        Positioned(
-                          top: 12, left: 12,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(10)),
-                            child: Text(asset.isVideo ? 'VIDEO' : 'IMAGE', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10)),
-                          ),
-                        ),
+            ),
+          ),
+          const SizedBox(height: 16),
 
-                        Positioned(
-                          bottom: 0, left: 0, right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.bottomCenter, end: Alignment.topCenter,
-                                colors: [Colors.black.withOpacity(0.8), Colors.transparent]
-                              )
-                            ),
-                            child: Text(asset.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis),
-                          ),
-                        )
-                      ],
-                    ),
+          // Categories
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              children: [
+                _buildCategoryPill('All'),
+                _buildCategoryPill('Company Brand'),
+                ...propertyProvider.properties.map((p) => _buildCategoryPill(p.name)).toList(),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Asset Grid
+          Expanded(
+            child: filteredAssets.isEmpty 
+              ? Center(child: Text('No assets found matching your criteria.', style: TextStyle(color: Colors.grey.shade600)))
+              : GridView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: kIsWeb ? 4 : 2, 
+                    crossAxisSpacing: 16, 
+                    mainAxisSpacing: 16, 
+                    childAspectRatio: 0.85
                   ),
-                );
-              },
-            )
-          ],
-        ),
+                  itemCount: filteredAssets.length,
+                  itemBuilder: (context, index) {
+                    final asset = filteredAssets[index];
+                    return GestureDetector(
+                      onTap: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (context) => MarketingAssetDetailsScreen(asset: asset, user: user)));
+                      },
+                      child: Container(
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          color: Colors.white, 
+                          borderRadius: BorderRadius.circular(24), 
+                          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 5))]
+                        ),
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            asset.isVideo 
+                                ? Container(color: Colors.black87, child: const Center(child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 48)))
+                                : Image.network(asset.url, fit: BoxFit.cover, errorBuilder: (c, e, s) => Container(color: Colors.grey.shade200, child: const Icon(Icons.broken_image_rounded))),
+                            
+                            Positioned(
+                              top: 12, left: 12,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(10)),
+                                child: Text(asset.isVideo ? 'VIDEO' : 'IMAGE', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10)),
+                              ),
+                            ),
+
+                            Positioned(
+                              bottom: 0, left: 0, right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.bottomCenter, end: Alignment.topCenter,
+                                    colors: [Colors.black.withOpacity(0.8), Colors.transparent]
+                                  )
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(asset.title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 14), maxLines: 2, overflow: TextOverflow.ellipsis),
+                                    const SizedBox(height: 4),
+                                    Text(asset.category, style: TextStyle(color: partnerAccent, fontWeight: FontWeight.bold, fontSize: 10), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                  ],
+                                ),
+                              ),
+                            )
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildCategoryPill(String label) {
+    bool isSelected = _selectedCategory == label;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedCategory = label),
+      child: Container(
+        margin: const EdgeInsets.only(right: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? textDark : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? textDark : Colors.grey.shade300),
+        ),
+        child: Text(label, style: TextStyle(color: isSelected ? Colors.white : textDark, fontWeight: FontWeight.bold, fontSize: 13)),
+      ),
+    );
+  }
+
+  void _showUploadDialog(BuildContext context, PropertyProvider propertyProvider) {
+    final titleCtrl = TextEditingController();
+    
+    List<String> categories = ['Company Brand', ...propertyProvider.properties.map((p) => p.name)];
+    String selectedCategory = categories.first;
+    
+    Uint8List? selectedFileBytes;
+    String? selectedFileName;
+    String? selectedFileExt;
+    bool isVideo = false;
+    bool isUploading = false;
+    String? errorMessage;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Upload Marketing Asset', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: textDark)),
+                    const SizedBox(height: 8),
+                    Text('Upload images or videos for your partners to co-brand.', style: TextStyle(color: Colors.grey.shade600)),
+                    const SizedBox(height: 32),
+
+                    TextField(
+                      controller: titleCtrl,
+                      onChanged: (_) => setState(() => errorMessage = null),
+                      decoration: InputDecoration(labelText: 'Asset Title', border: OutlineInputBorder(borderRadius: BorderRadius.circular(16))),
+                    ),
+                    const SizedBox(height: 16),
+
+                    DropdownButtonFormField<String>(
+                      isExpanded: true,
+                      decoration: InputDecoration(labelText: 'Assign to Category', border: OutlineInputBorder(borderRadius: BorderRadius.circular(16))),
+                      value: selectedCategory,
+                      items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                      onChanged: (val) => setState(() { selectedCategory = val!; errorMessage = null; }),
+                    ),
+                    const SizedBox(height: 16),
+
+                    InkWell(
+                      onTap: () async {
+                        FilePickerResult? result = await FilePicker.platform.pickFiles(
+                          type: FileType.media, // Accepts both Image and Video
+                          withData: true, 
+                        );
+
+                        if (result != null) {
+                          setState(() {
+                            selectedFileBytes = result.files.first.bytes;
+                            selectedFileName = result.files.first.name;
+                            selectedFileExt = result.files.first.extension?.toLowerCase() ?? '';
+                            
+                            // Determine if it is a video based on extension
+                            isVideo = ['mp4', 'mov', 'avi', 'mkv', 'webm'].contains(selectedFileExt);
+                            errorMessage = null;
+                          });
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 24),
+                        decoration: BoxDecoration(color: const Color(0xFFF7F7F9), border: Border.all(color: Colors.grey.shade300, width: 2), borderRadius: BorderRadius.circular(16)),
+                        child: Column(
+                          children: [
+                            Icon(selectedFileBytes != null ? (isVideo ? Icons.movie_rounded : Icons.image_rounded) : Icons.upload_file_rounded, size: 40, color: selectedFileBytes != null ? partnerAccent : Colors.grey),
+                            const SizedBox(height: 12),
+                            Text(selectedFileBytes != null ? selectedFileName! : 'Tap to Browse Media', style: TextStyle(fontWeight: FontWeight.bold, color: selectedFileBytes != null ? partnerAccent : textDark)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+
+                    if (errorMessage != null)
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.red.shade200)),
+                        child: Text(errorMessage!, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13)),
+                      ),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: textDark, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                        onPressed: isUploading ? null : () async {
+                          if (titleCtrl.text.isEmpty) { setState(() => errorMessage = 'Please enter a title.'); return; }
+                          if (selectedFileBytes == null) { setState(() => errorMessage = 'Please select a file to upload.'); return; }
+
+                          setState(() => isUploading = true);
+
+                          try {
+                            // Call the new provider method
+                            final url = await propertyProvider.uploadMarketingAsset(
+                              titleCtrl.text, selectedFileBytes!, selectedFileExt!, isVideo, selectedCategory
+                            );
+                            
+                            // Instantly update UI locally
+                            this.setState(() {
+                              assets.insert(0, MarketingAsset(id: DateTime.now().toString(), title: titleCtrl.text, url: url, isVideo: isVideo, category: selectedCategory));
+                            });
+
+                            if (mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Asset uploaded successfully! 🎉'), backgroundColor: Colors.green));
+                            }
+                          } catch (e) {
+                            setState(() {
+                              isUploading = false;
+                              errorMessage = 'Upload failed. Check connection / Database config.';
+                            });
+                          }
+                        },
+                        child: isUploading 
+                          ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+                          : const Text('Secure Upload', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+        );
+      }
     );
   }
 }
@@ -323,7 +558,7 @@ class _MarketingAssetDetailsScreenState extends State<MarketingAssetDetailsScree
                   ),
                   child: widget.asset.isVideo
                       ? const Center(child: Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 80))
-                      : Image.network(widget.asset.url, fit: BoxFit.contain),
+                      : Image.network(widget.asset.url, fit: BoxFit.contain, errorBuilder: (c, e, s) => const Center(child: Icon(Icons.broken_image_rounded, color: Colors.white54, size: 80))),
                 ),
               ),
               

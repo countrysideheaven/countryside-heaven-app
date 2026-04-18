@@ -206,6 +206,31 @@ class PropertyProvider extends ChangeNotifier {
     }
   }
 
+  Future<String> uploadMarketingAsset(String title, Uint8List fileBytes, String extension, bool isVideo, String category) async {
+    try {
+      _verifyR2Variables(); // Uses your existing R2 variables
+      final uniqueFileName = 'marketing/${DateTime.now().millisecondsSinceEpoch}.$extension';
+      
+      // Upload to Cloudflare R2
+      await _minio.putObject(_r2BucketName, uniqueFileName, Stream.value(fileBytes), size: fileBytes.length);
+
+      final String r2FileUrl = _r2PublicUrl.endsWith('/') ? '$_r2PublicUrl$uniqueFileName' : '$_r2PublicUrl/$uniqueFileName';
+
+      // Save record to Supabase
+      await _supabase.from('marketing_assets').insert({
+        'title': title,
+        'url': r2FileUrl,
+        'is_video': isVideo,
+        'category': category,
+      });
+      
+      return r2FileUrl; 
+    } catch (e) {
+      debugPrint('🚨 Error uploading marketing asset: $e');
+      rethrow;
+    }
+  }
+
   Future<void> addUnitToProperty(String propertyId, String customUnitName, double fractionPrice) async {
     final unitResp = await _supabase.from('units').insert({'property_id': propertyId, 'name': customUnitName, 'fraction_price': fractionPrice}).select().single();
     await _supabase.from('fractions').insert(List.generate(11, (index) => {'unit_id': unitResp['id'], 'fraction_index': index + 1}));
