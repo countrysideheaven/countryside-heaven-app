@@ -9,7 +9,7 @@ class AppUser {
   final String? referredByCode;
   final DateTime createdAt;
   
-  // Co-Branding Fields (Optional so they don't break existing user creation)
+  // Co-Branding Fields
   String? companyName;
   String? phoneNumber;
   String? logoUrl;
@@ -28,16 +28,29 @@ class AppUser {
   });
 
   factory AppUser.fromJson(Map<String, dynamic> json) {
+    // 👉 THE FIX: Bulletproof, case-insensitive role parsing
+    UserRole parsedRole = UserRole.customer;
+    final String dbRole = (json['role'] ?? '').toString().toLowerCase();
+
+    // Accurately maps any database string variation to the correct Flutter enum
+    if (dbRole.contains('admin')) {
+      parsedRole = UserRole.admin;
+    } else if (dbRole.contains('sales')) {
+      parsedRole = UserRole.salesAgent;
+    } else if (dbRole.contains('partner')) {
+      parsedRole = UserRole.channelPartner;
+    } else {
+      parsedRole = UserRole.customer;
+    }
+
     return AppUser(
       id: json['id'],
       name: json['name'],
       email: json['email'],
-      // Fallback to customer if role parsing fails
-      role: UserRole.values.firstWhere((e) => e.name == json['role'], orElse: () => UserRole.customer),
+      role: parsedRole,
       myReferralCode: json['my_referral_code'],
       referredByCode: json['referred_by_code'],
       createdAt: DateTime.parse(json['created_at']),
-      // New branding fields parsed safely
       companyName: json['company_name'],
       phoneNumber: json['phone_number'],
       logoUrl: json['logo_url'],
@@ -49,7 +62,7 @@ class AppUser {
       'id': id,
       'name': name,
       'email': email,
-      'role': role.name,
+      'role': role.name, // Will securely save back as 'salesAgent', 'customer', etc.
       'my_referral_code': myReferralCode,
       'referred_by_code': referredByCode,
       'created_at': createdAt.toIso8601String(),

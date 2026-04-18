@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../providers/property_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/property_models.dart';
+import '../../models/app_user.dart'; // 👉 NEW: Added to access UserRole
 import '../add_property_screen.dart';
 
 class AdminPropertiesScreen extends StatefulWidget {
@@ -38,7 +39,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
                 // Wrap the text in Expanded so it flexes to fit the screen
                 const Expanded(
                   child: Text(
-                    'Asset Registry 🏢', 
+                    'Asset Registry 🏢',
                     style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: textDark, letterSpacing: -1),
                     maxLines: 1, // Keeps it on one line
                     overflow: TextOverflow.ellipsis, // Adds ... if the screen is super tiny
@@ -63,7 +64,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Full control over properties, units, and fractional ownership.',
+              'Full control over properties, units, and fractional co-ownership.', // 👉 UPDATED Terminology
               style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
             ),
             const SizedBox(height: 32),
@@ -154,12 +155,10 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
               image: DecorationImage(
                 image: property.imageUrls.isNotEmpty
                     ? (property.imageUrls.first.startsWith('http')
-                          ? NetworkImage(property.imageUrls.first)
-                                as ImageProvider
-                          : (kIsWeb
-                                ? NetworkImage(property.imageUrls.first)
-                                : FileImage(File(property.imageUrls.first))
-                                      as ImageProvider))
+                        ? NetworkImage(property.imageUrls.first) as ImageProvider
+                        : (kIsWeb
+                            ? NetworkImage(property.imageUrls.first)
+                            : FileImage(File(property.imageUrls.first)) as ImageProvider))
                     // If no image is provided, show this gorgeous real estate placeholder
                     : const NetworkImage(
                         'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?q=80&w=2075&auto=format&fit=crop',
@@ -204,8 +203,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
                         _showConfirmDeleteDialog(
                           context: context,
                           title: 'Delete Property',
-                          content:
-                              'Are you sure? This will delete all units and fractions inside ${property.name}.',
+                          content: 'Are you sure? This will delete all units and fractions inside ${property.name}.',
                           onConfirm: () => Provider.of<PropertyProvider>(
                             context,
                             listen: false,
@@ -347,7 +345,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '\₹${unit.fractionPrice.toStringAsFixed(0)} / fraction',
+                      '₹${unit.fractionPrice.toStringAsFixed(0)} / fraction', // 👉 UPDATED: Cleaned up symbol
                       style: TextStyle(
                         color: Colors.grey.shade600,
                         fontWeight: FontWeight.bold,
@@ -581,9 +579,9 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
               controller: priceCtrl,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
-                labelText: 'Fraction Price (\₹)',
+                labelText: 'Fraction Price (₹)', // 👉 UPDATED
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.attach_money_rounded),
+                prefixIcon: Icon(Icons.currency_rupee_rounded), // 👉 UPDATED
               ),
             ),
             const SizedBox(height: 32),
@@ -629,6 +627,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
     final priceCtrl = TextEditingController(
       text: unit.fractionPrice.toStringAsFixed(0),
     );
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -644,8 +643,8 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
               controller: priceCtrl,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
-                labelText: 'Fraction Price (\₹)',
-                prefixText: '\₹',
+                labelText: 'Fraction Price (₹)', // 👉 UPDATED
+                prefixText: '₹ ', // 👉 UPDATED
               ),
             ),
           ],
@@ -723,10 +722,15 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
     String unitId,
     String fractionId,
   ) {
-    final users = Provider.of<AuthProvider>(
-      context,
-      listen: false,
-    ).getDownline('ADMIN123');
+    // 👉 STRICT FILTER: Pull all users, explicitly block Admin/Partner/Sales, only keep genuine Customers
+    final allUsers = Provider.of<AuthProvider>(context, listen: false).allUsers;
+    
+    final customers = allUsers.where((u) => 
+      u.role == UserRole.customer && 
+      u.role != UserRole.admin && 
+      u.role != UserRole.channelPartner && 
+      u.role != UserRole.salesAgent
+    ).toList();
 
     showModalBottomSheet(
       context: context,
@@ -741,24 +745,25 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            if (users.isEmpty)
+            if (customers.isEmpty)
               const Text(
-                'No users available. Add users in the Network Tree first.',
+                'No customer accounts found. Ensure users are registered with the Customer role.',
               )
             else
               Expanded(
                 child: ListView.builder(
-                  itemCount: users.length,
+                  itemCount: customers.length,
                   itemBuilder: (context, index) => ListTile(
                     leading: CircleAvatar(
                       backgroundColor: vibrantAccent.withOpacity(0.1),
                       child: const Icon(Icons.person, color: vibrantAccent),
                     ),
                     title: Text(
-                      users[index].name,
+                      customers[index].name,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    subtitle: Text(users[index].email),
+                    // 👉 VISUAL CONFIRMATION: The subtitle now displays the exact role assigned in the database
+                    subtitle: Text('${customers[index].email} • Role: ${customers[index].role.name.toUpperCase()}'),
                     trailing: ElevatedButton(
                       onPressed: () {
                         Provider.of<PropertyProvider>(
@@ -768,7 +773,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
                           propId,
                           unitId,
                           fractionId,
-                          users[index].id,
+                          customers[index].id,
                         );
                         Navigator.pop(context);
                       },
@@ -798,7 +803,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Manage Fraction'),
         content: const Text(
-          'This fraction is already assigned to a user. Do you want to revoke their ownership?',
+          'This fraction is already assigned to a user. Do you want to revoke their co-ownership?', // 👉 UPDATED
         ),
         actions: [
           TextButton(
@@ -817,7 +822,7 @@ class _AdminPropertiesScreenState extends State<AdminPropertiesScreen> {
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Revoke Ownership'),
+            child: const Text('Revoke Co-ownership'), // 👉 UPDATED
           ),
         ],
       ),
